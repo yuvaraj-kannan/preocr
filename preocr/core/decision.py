@@ -14,7 +14,9 @@ get_reason_description = reason_codes.get_reason_description
 _DEFAULT_CONFIG = Config()
 
 
-def decide(signals: Dict[str, Any], config: Optional[Config] = None) -> Tuple[bool, str, float, str, str]:
+def decide(
+    signals: Dict[str, Any], config: Optional[Config] = None
+) -> Tuple[bool, str, float, str, str]:
     """
     Decide if a file needs OCR based on collected signals.
 

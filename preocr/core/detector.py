@@ -123,13 +123,17 @@ def needs_ocr(
         if layout_aware:
             if progress_callback:
                 progress_callback("analyzing_layout", 0.5)
-            layout_result = layout_analyzer_module.analyze_pdf_layout(str(path), page_level=page_level)
+            layout_result = layout_analyzer_module.analyze_pdf_layout(
+                str(path), page_level=page_level
+            )
 
         # Perform page-level analysis if requested
         if page_level and "pages" in text_result:
             if progress_callback:
                 progress_callback("analyzing_pages", 0.6)
-            page_analysis = page_detection_module.analyze_pdf_pages(str(path), file_info, text_result)
+            page_analysis = page_detection_module.analyze_pdf_pages(
+                str(path), file_info, text_result
+            )
     elif "officedocument" in mime or extension in ["docx", "pptx", "xlsx"]:
         # Office document text extraction
         text_result = office_probe_module.extract_office_text(str(path), mime)

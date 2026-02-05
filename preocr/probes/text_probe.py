@@ -1,6 +1,5 @@
 """Text extraction for plain text files and HTML."""
 
-import codecs
 from pathlib import Path
 from typing import Any, Dict, Optional
 

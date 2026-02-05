@@ -1,6 +1,6 @@
 """Page-level detection for multi-page documents."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from .. import constants, reason_codes
 from ..core.decision import decide

@@ -1,7 +1,7 @@
 """Layout analysis for PDFs to detect text regions, images, and mixed content."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict
 
 from .. import exceptions
 from ..utils.logger import get_logger

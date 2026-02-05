@@ -2,10 +2,9 @@
 
 import uuid
 from typing import List, Optional, Dict, Any
-from pathlib import Path
 
 from .. import exceptions
-from .schemas import BoundingBox, Element, ElementType
+from .schemas import BoundingBox, ElementType
 
 ExtractionError = exceptions.PreOCRError
 
@@ -43,7 +42,12 @@ def create_bbox(
     )
 
 
-def calculate_bbox_from_chars(chars: List[Dict[str, Any]], page_number: int, page_width: Optional[float] = None, page_height: Optional[float] = None) -> Optional[BoundingBox]:
+def calculate_bbox_from_chars(
+    chars: List[Dict[str, Any]],
+    page_number: int,
+    page_width: Optional[float] = None,
+    page_height: Optional[float] = None,
+) -> Optional[BoundingBox]:
     """Calculate bounding box from a list of character positions."""
     if not chars:
         return None
@@ -53,7 +57,9 @@ def calculate_bbox_from_chars(chars: List[Dict[str, Any]], page_number: int, pag
     x1 = max(char.get("x1", 0) for char in chars)
     y1 = max(char.get("bottom", char.get("y1", 0)) for char in chars)
 
-    return create_bbox(x0, y0, x1, y1, page_number, layout_width=page_width, layout_height=page_height)
+    return create_bbox(
+        x0, y0, x1, y1, page_number, layout_width=page_width, layout_height=page_height
+    )
 
 
 def calculate_confidence(
@@ -78,10 +84,7 @@ def calculate_confidence(
 
     # Weighted average
     confidence = (
-        text_quality * 0.3
-        + method_score * 0.3
-        + element_type_certainty * 0.2
-        + bbox_accuracy * 0.2
+        text_quality * 0.3 + method_score * 0.3 + element_type_certainty * 0.2 + bbox_accuracy * 0.2
     )
 
     return min(max(confidence, 0.0), 1.0)
@@ -123,4 +126,3 @@ def classify_element_type(
 
     # Default to narrative text
     return ElementType.NARRATIVE_TEXT
-

@@ -51,4 +51,3 @@ __all__ = [
     "format_as_json",
     "format_as_markdown",
 ]
-

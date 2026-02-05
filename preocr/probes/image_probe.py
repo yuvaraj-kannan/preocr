@@ -11,7 +11,7 @@ ImageProcessingError = exceptions.ImageProcessingError
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from PIL import Image as PILImage
+    pass
 
 # Declare these as Optional[Any] so mypy knows they can be None
 Image: Optional[Any]

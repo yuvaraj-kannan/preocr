@@ -1,7 +1,7 @@
 """PDF extraction with structured output."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 
 from .. import exceptions
 from ..utils.logger import get_logger
@@ -11,7 +11,6 @@ from .schemas import (
     Table,
     FormField,
     ElementType,
-    BoundingBox,
     TableCell,
     Section,
 )
@@ -63,6 +62,8 @@ def extract_pdf_native_data(
         file_type="pdf",
         extraction_method="native",
         overall_confidence=0.0,
+        document_type=None,
+        pages_extracted=None,
     )
 
     errors = []
@@ -140,10 +141,12 @@ def _extract_with_pdfplumber(
 
             # Extract metadata
             if include_metadata:
-                result.metadata.update({
-                    "page_count": page_count,
-                    "extraction_method": "pdfplumber",
-                })
+                result.metadata.update(
+                    {
+                        "page_count": page_count,
+                        "extraction_method": "pdfplumber",
+                    }
+                )
                 if pdf.metadata:
                     result.metadata["pdf_metadata"] = pdf.metadata
 
@@ -202,7 +205,9 @@ def _extract_with_pdfplumber(
             # Extract forms using PyMuPDF (if available)
             if include_forms and fitz:
                 try:
-                    forms = _extract_forms_pymupdf(path, pages_to_process, form_counter, include_bbox)
+                    forms = _extract_forms_pymupdf(
+                        path, pages_to_process, form_counter, include_bbox
+                    )
                     all_forms.extend(forms)
                 except Exception as e:
                     logger.warning(f"Form extraction failed: {e}")
@@ -270,11 +275,11 @@ def _extract_with_pymupdf(
     pages: Optional[List[int]],
 ) -> ExtractionResult:
     """Extract using PyMuPDF (fallback)."""
-    all_elements = []
-    all_tables = []
-    all_forms = []
-    all_images = []
-    all_sections = []
+    all_elements: List[Element] = []
+    all_tables: List[Table] = []
+    all_forms: List[FormField] = []
+    all_images: List[Element] = []
+    all_sections: List[Section] = []
     element_counter = 0
     form_counter = 0
     image_counter = 0
@@ -288,10 +293,12 @@ def _extract_with_pymupdf(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "page_count": page_count,
-                "extraction_method": "pymupdf",
-            })
+            result.metadata.update(
+                {
+                    "page_count": page_count,
+                    "extraction_method": "pymupdf",
+                }
+            )
             if doc.metadata:
                 result.metadata["pdf_metadata"] = doc.metadata
 
@@ -409,7 +416,7 @@ def _extract_page_elements(
     include_bbox: bool,
 ) -> List[Element]:
     """Extract text elements from a page using pdfplumber."""
-    elements = []
+    elements: List[Element] = []
     chars = page.chars if hasattr(page, "chars") else []
 
     if not chars:
@@ -433,7 +440,7 @@ def _extract_page_elements(
         # Classify element type
         font_size = block[0].get("size", 12) if block else 12
         is_bold = block[0].get("fontname", "").endswith("Bold") if block else False
-        position_y = bbox.y0
+        position_y = bbox.y0 if bbox else 0.0
         is_centered = _is_text_centered(block, page_width)
 
         element_type = classify_element_type(
@@ -444,6 +451,10 @@ def _extract_page_elements(
             page_height=page_height,
             is_centered=is_centered,
         )
+
+        # Ensure bbox is not None
+        if bbox is None:
+            bbox = create_bbox(0, 0, page_width, page_height, page_num, page_width, page_height)
 
         # Calculate confidence
         confidence = calculate_confidence(
@@ -460,6 +471,8 @@ def _extract_page_elements(
             bbox=bbox,
             confidence=confidence,
             metadata={"font_size": font_size, "is_bold": is_bold},
+            parent_id=None,
+            reading_order=None,
         )
 
         elements.append(element)
@@ -476,7 +489,7 @@ def _extract_page_elements_pymupdf(
     include_bbox: bool,
 ) -> List[Element]:
     """Extract text elements from a page using PyMuPDF."""
-    elements = []
+    elements: List[Element] = []
     text_dict = page.get_text("dict")
 
     if not text_dict or "blocks" not in text_dict:
@@ -546,6 +559,8 @@ def _extract_page_elements_pymupdf(
             bbox=bbox,
             confidence=confidence,
             metadata={"font_size": font_size, "is_bold": is_bold},
+            parent_id=None,
+            reading_order=None,
         )
 
         elements.append(element)
@@ -589,7 +604,9 @@ def _extract_page_tables(
                 )
 
         if not table_bbox:
-            table_bbox = create_bbox(0, 0, page_width, page_height, page_num, page_width, page_height)
+            table_bbox = create_bbox(
+                0, 0, page_width, page_height, page_num, page_width, page_height
+            )
 
         # Extract cells
         cells = []
@@ -658,7 +675,7 @@ def _extract_forms_pymupdf(
     include_bbox: bool,
 ) -> List[FormField]:
     """Extract form fields using PyMuPDF."""
-    forms = []
+    forms: List[FormField] = []
 
     if not fitz:
         return forms
@@ -699,7 +716,9 @@ def _extract_forms_pymupdf(
                         page_height,
                     )
                 else:
-                    bbox = create_bbox(0, 0, page_width, page_height, page_num, page_width, page_height)
+                    bbox = create_bbox(
+                        0, 0, page_width, page_height, page_num, page_width, page_height
+                    )
 
                 form_field = FormField(
                     element_id=field_id,
@@ -809,6 +828,8 @@ def _extract_page_images_pdfplumber(
                 "height": img.get("height", 0),
                 "extraction_method": "pdfplumber",
             },
+            parent_id=None,
+            reading_order=None,
         )
 
         images.append(image_element)
@@ -860,6 +881,8 @@ def _extract_page_images_pymupdf(
                 "image_index": img_index[0],
                 "extraction_method": "pymupdf",
             },
+            parent_id=None,
+            reading_order=None,
         )
 
         images.append(image_element)
@@ -874,7 +897,7 @@ def _detect_sections(
     start_counter: int,
 ) -> List[Section]:
     """Detect document sections (header, body, footer)."""
-    sections = []
+    sections: List[Section] = []
     section_counter = start_counter
 
     if not elements:
@@ -900,15 +923,11 @@ def _detect_sections(
 
         # Detect header (top 15% of page)
         header_threshold = page_height * 0.15
-        header_elements = [
-            elem for elem in page_elements if elem.bbox.y0 < header_threshold
-        ]
+        header_elements = [elem for elem in page_elements if elem.bbox.y0 < header_threshold]
 
         # Detect footer (bottom 15% of page)
         footer_threshold = page_height * 0.85
-        footer_elements = [
-            elem for elem in page_elements if elem.bbox.y1 > footer_threshold
-        ]
+        footer_elements = [elem for elem in page_elements if elem.bbox.y1 > footer_threshold]
 
         # Body elements (middle)
         body_elements = [
@@ -931,6 +950,7 @@ def _detect_sections(
                     elements=[e.element_id for e in header_elements],
                     confidence=0.8,
                     metadata={"is_repeated": False},
+                    parent_section_id=None,
                 )
             )
 
@@ -947,6 +967,7 @@ def _detect_sections(
                     elements=[e.element_id for e in body_elements],
                     confidence=0.9,
                     metadata={"content_density": len(body_elements) / max(len(page_elements), 1)},
+                    parent_section_id=None,
                 )
             )
 
@@ -963,6 +984,7 @@ def _detect_sections(
                     elements=[e.element_id for e in footer_elements],
                     confidence=0.8,
                     metadata={"is_repeated": False},
+                    parent_section_id=None,
                 )
             )
 
@@ -1018,7 +1040,9 @@ def _calculate_overall_confidence(
     return sum(all_confidences) / len(all_confidences)
 
 
-def _group_chars_into_blocks(chars: List[Dict[str, Any]], threshold: float = 5.0) -> List[List[Dict[str, Any]]]:
+def _group_chars_into_blocks(
+    chars: List[Dict[str, Any]], threshold: float = 5.0
+) -> List[List[Dict[str, Any]]]:
     """Group characters into text blocks based on proximity."""
     if not chars:
         return []
@@ -1057,5 +1081,4 @@ def _is_text_centered(chars: List[Dict[str, Any]], page_width: float) -> bool:
     page_center = page_width / 2
 
     # Consider centered if within 10% of page center
-    return abs(text_center - page_center) < page_width * 0.1
-
+    return bool(abs(text_center - page_center) < page_width * 0.1)

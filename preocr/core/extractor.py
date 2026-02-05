@@ -1,7 +1,7 @@
 """Main API for native data extraction."""
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from .. import constants, exceptions
 from ..utils import filetype, logger as logger_module
@@ -76,7 +76,11 @@ def extract_native_data(
     # Determine file type category
     if mime_type == "application/pdf" or extension == "pdf":
         file_type_category = "pdf"
-    elif mime_type.startswith("application/vnd.openxmlformats") or extension in ["docx", "pptx", "xlsx"]:
+    elif mime_type.startswith("application/vnd.openxmlformats") or extension in [
+        "docx",
+        "pptx",
+        "xlsx",
+    ]:
         file_type_category = "office"
     elif mime_type.startswith("text/") or extension in ["txt", "html", "htm", "csv"]:
         file_type_category = "text"
@@ -117,8 +121,9 @@ def extract_native_data(
             extraction_method="native",
             overall_confidence=0.0,
             errors=[f"Unsupported file type: {file_type_category}"],
+            document_type=None,
+            pages_extracted=None,
         )
 
     # Format output
     return format_result(result, output_format=output_format)
-

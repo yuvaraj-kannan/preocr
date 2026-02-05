@@ -2,7 +2,6 @@
 
 import logging
 import os
-from typing import Optional
 
 # Default log level
 _DEFAULT_LOG_LEVEL = logging.WARNING
