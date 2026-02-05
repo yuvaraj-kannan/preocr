@@ -341,6 +341,9 @@ jobs:
           echo "Current commit: $CURRENT_COMMIT"
           echo "Current commit message:"
           git log -1 --pretty=format:"%s"
+          # Install pydantic before version check
+          python -m pip install --upgrade pip
+          pip install pydantic>=2.0.0
           # Verify version in the code matches what we expect
           CODE_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from preocr.version import __version__; print(__version__)")
           EXPECTED_VERSION="${{ steps.version.outputs.version }}"
