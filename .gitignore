@@ -79,3 +79,12 @@ dmypy.json
 .pytest_cache/
 test.py
 
+# Test data and results
+data-source-formats/
+test_*.py
+test_*.txt
+test_*.csv
+test_*.json
+TEST_RESULTS.md
+sample-unstructured-paper.pdf
+

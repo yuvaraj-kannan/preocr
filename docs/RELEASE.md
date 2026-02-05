@@ -1,3 +1,7 @@
+# PyPI Release Guide - PreOCR
+
+> **For step-by-step release instructions, see [RELEASE_STEPS.md](RELEASE_STEPS.md)**
+
 # PyPI Release Guide - PreOCR v0.4.0
 
 ## Pre-Release Checklist
@@ -107,4 +111,83 @@ After successful upload:
 - Enhanced documentation and project files
 
 See CHANGELOG.md for complete details.
+
+## Release Folder Management
+
+PreOCR maintains versioned release notes in the `releases/` folder. Each release has two files:
+
+- `vX.Y.Z.md` - Human-readable release notes
+- `vX.Y.Z.json` - Machine-readable release metadata
+
+### Automatic Generation
+
+Release files are automatically generated when a version bump PR is merged:
+
+1. Version is bumped in `preocr/version.py`
+2. CHANGELOG.md is updated with new version entry
+3. On PR merge, CI/CD automatically:
+   - Generates release files (`releases/vX.Y.Z.md` and `releases/vX.Y.Z.json`)
+   - Commits them to the repository
+   - Uses them for GitHub Release notes
+
+### Manual Generation
+
+You can also generate release files manually:
+
+```bash
+# Generate for current version
+python scripts/generate_release.py
+
+# Generate for specific version
+python scripts/generate_release.py v0.4.0
+
+# Sync all releases from CHANGELOG.md
+python scripts/sync_releases.py
+```
+
+### Query Release Information
+
+Query release information for CI/CD or scripts:
+
+```bash
+# Get JSON (default)
+python scripts/get_release_info.py v0.4.0
+
+# Get Markdown
+python scripts/get_release_info.py v0.4.0 --format markdown
+
+# List all releases
+python scripts/get_release_info.py --list
+```
+
+### CI/CD Integration
+
+Release files are integrated into the CI/CD pipeline:
+
+- **On Version Bump**: Release files are auto-generated and committed
+- **GitHub Releases**: JSON files are used to populate release descriptions
+- **Validation**: CI/CD validates that release files exist and are properly formatted
+
+For more details, see `releases/README.md`.
+
+## CHANGELOG.md Quality Standards
+
+Starting from version 0.8.0, all CHANGELOG.md entries must be:
+
+- **Clear and well-structured**: Use proper sections (Added/Changed/Fixed)
+- **User-focused**: Write for end users, not developers
+- **Well-formatted**: Use bold for features, proper dates, structured sections
+- **Complete**: Document all significant changes
+
+See `docs/CHANGELOG_GUIDELINES.md` for detailed guidelines and examples.
+
+### Validation
+
+CI/CD automatically validates:
+- CHANGELOG.md entry exists for the version
+- Entry has proper date format (YYYY-MM-DD)
+- Entry has structured sections
+- Quality indicators (bold features, clear descriptions)
+
+The workflow will **fail** if CHANGELOG.md entry is missing or improperly formatted.
 

@@ -1,0 +1,26 @@
+{
+  "version": "0.3.1",
+  "tag": "v0.3.1",
+  "release_date": "2024-12-29",
+  "status": "released",
+  "changes": {
+    "changed": [
+      "Updated `layout-refinement` dependency to use `opencv-python-headless` (lighter, better for server environments)",
+      "Improved OpenCV layout detection algorithm with adaptive thresholding and better filtering",
+      "Enhanced multi-page analysis: analyzes all pages for small PDFs, smart sampling for large ones",
+      "Improved decision refinement using `layout_type` for more accurate decisions"
+    ],
+    "added": [
+      "Documentation for libmagic system requirement with OS-specific installation instructions",
+      "Better result structure with OpenCV analysis details in `layout[\"opencv\"]`"
+    ],
+    "fixed": [
+      "Better handling of missing OpenCV dependencies",
+      "Improved layout display formatting in examples"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.3.1/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.1"
+  }
+}

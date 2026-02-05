@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "tag": "v0.2.0",
+  "release_date": "2024-12-28",
+  "status": "released",
+  "changes": {
+    "added": [
+      "**Page-level detection**: Analyze PDFs page-by-page to identify which pages need OCR",
+      "**Reason codes**: Structured reason codes (e.g., `PDF_DIGITAL`, `IMAGE_FILE`) for programmatic decision handling",
+      "**Enhanced confidence scoring**: Improved confidence calculation with page-level analysis support",
+      "New `page_level` parameter to `needs_ocr()` function for PDF page-level analysis",
+      "`reason_code` field in API response for structured decision tracking",
+      "Support for mixed PDFs (some pages digital, some scanned)"
+    ],
+    "changed": [
+      "Decision engine now returns reason codes in addition to human-readable reasons",
+      "Confidence scores are more nuanced based on page-level analysis",
+      "API response structure enhanced with `reason_code` field"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.2.0/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.2.0"
+  }
+}

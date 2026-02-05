@@ -1,0 +1,18 @@
+{
+  "version": "0.3.2",
+  "tag": "v0.3.2",
+  "release_date": "2024-12-30",
+  "status": "released",
+  "changes": {
+    "added": [
+      "**Dynamic Confidence Scoring**: Implemented formula-based confidence scores for PDFs (digital and scanned) and OpenCV refinement, providing more granular and accurate confidence levels based on text length, coverage, and ratios."
+    ],
+    "changed": [
+      "`preocr/decision.py`: Updated confidence calculation logic to use dynamic formulas instead of fixed thresholds for various PDF scenarios, improving accuracy and granularity of confidence scores."
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.3.2/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.2"
+  }
+}

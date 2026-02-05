@@ -174,12 +174,97 @@ jobs:
           fi
           echo "✓ Built package version matches tag: $WHEEL_VERSION"
       
+      - name: Validate release files exist
+        run: |
+          TAG="${{ github.ref_name }}"
+          JSON_FILE="releases/${TAG}.json"
+          MD_FILE="releases/${TAG}.md"
+          
+          if [ ! -f "$JSON_FILE" ]; then
+            echo "ERROR: Release JSON file not found: $JSON_FILE"
+            echo "Please ensure release files are generated before creating a release."
+            exit 1
+          fi
+          
+          if [ ! -f "$MD_FILE" ]; then
+            echo "WARNING: Release Markdown file not found: $MD_FILE"
+            echo "Continuing with JSON file only..."
+          fi
+          
+          echo "✓ Release files validated"
+      
+      - name: Generate release notes from JSON
+        id: release_notes
+        run: |
+          TAG="${{ github.ref_name }}"
+          JSON_FILE="releases/${TAG}.json"
+          
+          # Convert JSON to markdown format for GitHub Release
+          python -c "
+          import json
+          import sys
+          
+          with open('$JSON_FILE') as f:
+              data = json.load(f)
+          
+          notes = f\"# Release {data['tag']}\\n\\n\"
+          notes += f\"**Release Date**: {data['release_date']}\\n\\n\"
+          
+          changes = data.get('changes', {})
+          if changes:
+              notes += \"## Changes\\n\\n\"
+              
+              # Standard section order
+              section_order = ['added', 'changed', 'deprecated', 'removed', 'fixed', 'security', 'performance']
+              section_titles = {
+                  'added': 'Added',
+                  'changed': 'Changed',
+                  'deprecated': 'Deprecated',
+                  'removed': 'Removed',
+                  'fixed': 'Fixed',
+                  'security': 'Security',
+                  'performance': 'Performance'
+              }
+              
+              for section_key in section_order:
+                  if section_key in changes and changes[section_key]:
+                      notes += f\"### {section_titles.get(section_key, section_key.title())}\\n\\n\"
+                      for item in changes[section_key]:
+                          notes += f\"- {item}\\n\"
+                      notes += \"\\n\"
+              
+              # Add any other sections
+              for section_key, items in changes.items():
+                  if section_key not in section_order and items:
+                      notes += f\"### {section_key.title()}\\n\\n\"
+                      for item in items:
+                          notes += f\"- {item}\\n\"
+                      notes += \"\\n\"
+          
+          # Add artifacts
+          artifacts = data.get('artifacts', {})
+          if artifacts:
+              notes += \"## Artifacts\\n\\n\"
+              if artifacts.get('pypi'):
+                  notes += f\"- PyPI: {artifacts['pypi']}\\n\"
+              if artifacts.get('github'):
+                  notes += f\"- GitHub Release: {artifacts['github']}\\n\"
+              notes += \"\\n\"
+          
+          with open('release_notes.txt', 'w') as f:
+              f.write(notes)
+          
+          print('Release notes generated')
+          "
+          echo "notes_file=release_notes.txt" >> $GITHUB_OUTPUT
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ steps.release_notes.outputs.notes_file }}
+          generate_release_notes: false
           draft: false
           prerelease: false
         env:

@@ -1,0 +1,16 @@
+{
+  "version": "0.5.2",
+  "tag": "v0.5.2",
+  "release_date": "2026-01-10",
+  "status": "released",
+  "changes": {
+    "changed": [
+      "Enhanced release workflow with GitHub release creation and version verification",
+      "Improved CI/CD pipeline reliability"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.5.2/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.2"
+  }
+}

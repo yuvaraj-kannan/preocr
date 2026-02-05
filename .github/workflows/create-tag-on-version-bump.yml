@@ -70,8 +70,25 @@ jobs:
             echo "Tag version: $TAG_VERSION"
             exit 1
           fi
-          # Create annotated tag on current HEAD
-          git tag -a "$TAG" -m "Release $TAG"
+          # Create annotated tag with detailed message
+          # Extract release date from CHANGELOG.md
+          CHANGELOG="docs/CHANGELOG.md"
+          RELEASE_DATE=$(grep -A 1 "^## \[$CODE_VERSION\]" "$CHANGELOG" | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2}" | head -1 || echo "")
+          
+          if [ -n "$RELEASE_DATE" ]; then
+            TAG_MESSAGE="Release $TAG
+
+Release Date: $RELEASE_DATE
+See CHANGELOG.md for detailed changes.
+GitHub: https://github.com/yuvaraj3855/preocr/releases/tag/$TAG"
+          else
+            TAG_MESSAGE="Release $TAG
+
+See CHANGELOG.md for detailed changes.
+GitHub: https://github.com/yuvaraj3855/preocr/releases/tag/$TAG"
+          fi
+          
+          git tag -a "$TAG" -m "$TAG_MESSAGE"
           # Verify tag was created
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "✓ Tag $TAG created successfully"
@@ -85,13 +102,161 @@ jobs:
           echo "✓ Created and pushed tag $TAG"
           echo "This will trigger the release workflow to publish to PyPI"
       
+      - name: Validate CHANGELOG.md entry quality
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHANGELOG="docs/CHANGELOG.md"
+          
+          # Check if entry exists
+          if ! grep -q "^## \[$VERSION\]" "$CHANGELOG"; then
+            echo "ERROR: CHANGELOG.md entry missing for version $VERSION"
+            echo ""
+            echo "Please add a well-structured entry to CHANGELOG.md before creating a release."
+            echo "See docs/CHANGELOG_GUIDELINES.md for formatting guidelines."
+            echo ""
+            echo "Required format:"
+            echo "## [$VERSION] - YYYY-MM-DD"
+            echo ""
+            echo "### Added"
+            echo "- **Feature**: Description"
+            echo ""
+            exit 1
+          fi
+          
+          # Extract the version entry
+          ENTRY_START=$(grep -n "^## \[$VERSION\]" "$CHANGELOG" | cut -d: -f1)
+          if [ -z "$ENTRY_START" ]; then
+            echo "ERROR: Could not find CHANGELOG.md entry for $VERSION"
+            exit 1
+          fi
+          
+          # Check for date
+          ENTRY_LINE=$(sed -n "${ENTRY_START}p" "$CHANGELOG")
+          if ! echo "$ENTRY_LINE" | grep -qE "[0-9]{4}-[0-9]{2}-[0-9]{2}"; then
+            echo "WARNING: CHANGELOG.md entry for $VERSION missing date (YYYY-MM-DD format)"
+            echo "Entry: $ENTRY_LINE"
+          fi
+          
+          # Check for structured sections (at least one of Added/Changed/Fixed)
+          ENTRY_END=$(sed -n "$((ENTRY_START+1)),\$p" "$CHANGELOG" | grep -n "^## \[" | head -1 | cut -d: -f1)
+          if [ -z "$ENTRY_END" ]; then
+            ENTRY_END=$(wc -l < "$CHANGELOG")
+          else
+            ENTRY_END=$((ENTRY_START + ENTRY_END - 1))
+          fi
+          
+          ENTRY_CONTENT=$(sed -n "${ENTRY_START},${ENTRY_END}p" "$CHANGELOG")
+          
+          if ! echo "$ENTRY_CONTENT" | grep -qE "^(### Added|### Changed|### Fixed|### Deprecated|### Removed|### Security)"; then
+            echo "WARNING: CHANGELOG.md entry for $VERSION lacks structured sections"
+            echo "Consider adding sections like: ### Added, ### Changed, ### Fixed"
+          fi
+          
+          # Check for quality indicators (bold features, clear descriptions)
+          if echo "$ENTRY_CONTENT" | grep -q "\*\*.*\*\*"; then
+            echo "✓ CHANGELOG.md entry includes bold feature names (good practice)"
+          else
+            echo "INFO: Consider using **bold** for feature/component names in CHANGELOG.md"
+          fi
+          
+          echo "✓ CHANGELOG.md entry validated for $VERSION"
+      
+      - name: Generate release files
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Generating release files for version $VERSION"
+          python scripts/generate_release.py "$VERSION"
+          echo "Release files generated successfully"
+      
+      - name: Commit release files
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add releases/
+          if git diff --staged --quiet; then
+            echo "No release files to commit"
+          else
+            git commit -m "chore: add release files for ${{ steps.check_tag.outputs.tag }}"
+            git push origin main
+            echo "✓ Release files committed"
+          fi
+      
+      - name: Get release notes from JSON
+        if: steps.check_tag.outputs.exists == 'false'
+        id: release_notes
+        run: |
+          TAG="${{ steps.check_tag.outputs.tag }}"
+          JSON_FILE="releases/${TAG}.json"
+          if [ -f "$JSON_FILE" ]; then
+            # Extract release notes from JSON (convert to markdown-like format)
+            python -c "
+            import json
+            import sys
+            try:
+                with open('$JSON_FILE') as f:
+                    data = json.load(f)
+                notes = f\"# Release {data['tag']}\\n\\n\"
+                notes += f\"**Release Date**: {data['release_date']}\\n\\n\"
+                changes = data.get('changes', {})
+                if changes:
+                    notes += \"## Changes\\n\\n\"
+                    # Standard section order
+                    section_order = ['added', 'changed', 'deprecated', 'removed', 'fixed', 'security', 'performance']
+                    section_titles = {
+                        'added': 'Added',
+                        'changed': 'Changed',
+                        'deprecated': 'Deprecated',
+                        'removed': 'Removed',
+                        'fixed': 'Fixed',
+                        'security': 'Security',
+                        'performance': 'Performance'
+                    }
+                    for section_key in section_order:
+                        if section_key in changes and changes[section_key]:
+                            notes += f\"### {section_titles.get(section_key, section_key.title())}\\n\\n\"
+                            for item in changes[section_key]:
+                                notes += f\"- {item}\\n\"
+                            notes += \"\\n\"
+                    # Add any other sections
+                    for section_key, items in changes.items():
+                        if section_key not in section_order and items:
+                            notes += f\"### {section_key.title()}\\n\\n\"
+                            for item in items:
+                                notes += f\"- {item}\\n\"
+                            notes += \"\\n\"
+                # Add artifacts
+                artifacts = data.get('artifacts', {})
+                if artifacts:
+                    notes += \"## Artifacts\\n\\n\"
+                    if artifacts.get('pypi'):
+                        notes += f\"- PyPI: {artifacts['pypi']}\\n\"
+                    if artifacts.get('github'):
+                        notes += f\"- GitHub Release: {artifacts['github']}\\n\"
+                    notes += \"\\n\"
+                with open('release_notes.txt', 'w') as f:
+                    f.write(notes)
+                print('Release notes generated')
+            except Exception as e:
+                print(f'Error generating release notes: {e}', file=sys.stderr)
+                sys.exit(1)
+            "
+            echo "notes_file=release_notes.txt" >> $GITHUB_OUTPUT
+          else
+            echo "WARNING: Release JSON file not found, using auto-generated notes"
+            echo "notes_file=" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.check_tag.outputs.tag }}
           name: Release ${{ steps.check_tag.outputs.tag }}
-          generate_release_notes: true
+          body_path: ${{ steps.release_notes.outputs.notes_file != '' && steps.release_notes.outputs.notes_file || '' }}
+          generate_release_notes: ${{ steps.release_notes.outputs.notes_file == '' }}
           draft: false
           prerelease: false
         env:

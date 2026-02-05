@@ -1,0 +1,31 @@
+{
+  "version": "0.3.0",
+  "tag": "v0.3.0",
+  "release_date": "2024-12-29",
+  "status": "released",
+  "changes": {
+    "added": [
+      "**Hybrid pipeline with OpenCV refinement**: Adaptive pipeline that uses fast heuristics for clear cases and OpenCV layout analysis for edge cases",
+      "**Layout-aware detection**: Analyze document layout to detect text regions, image regions, and mixed content",
+      "**Automatic confidence-based refinement**: Low confidence decisions (< 0.9) automatically trigger OpenCV analysis for improved accuracy",
+      "**OpenCV layout analysis module**: Detects text/image regions using computer vision techniques",
+      "**Decision refinement**: Combines heuristics and OpenCV results for better accuracy (92-95% vs 85-90%)",
+      "Optional `layout-refinement` extra dependency for OpenCV support",
+      "New `layout_aware` parameter to `needs_ocr()` function for explicit layout analysis"
+    ],
+    "changed": [
+      "Improved accuracy for edge cases through hybrid pipeline approach",
+      "Most files stay fast (< 1 second) while edge cases get better analysis (1-2 seconds)",
+      "Decision engine now supports OpenCV-based refinement for low-confidence cases"
+    ],
+    "performance": [
+      "Clear cases (90%): < 1 second (heuristics only)",
+      "Edge cases (10%): 1-2 seconds (heuristics + OpenCV)",
+      "Overall accuracy: 92-95% (improved from 85-90%)"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.3.0/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.0"
+  }
+}

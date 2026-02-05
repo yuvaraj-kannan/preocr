@@ -1,0 +1,17 @@
+{
+  "version": "0.1.1",
+  "tag": "v0.1.1",
+  "release_date": "2024-12-28",
+  "status": "released",
+  "changes": {
+    "changed": [
+      "Updated GitHub URLs in package metadata to point to correct repository",
+      "Fixed license format in pyproject.toml (use string instead of table)",
+      "Removed deprecated license classifier"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.1.1/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.1.1"
+  }
+}

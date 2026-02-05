@@ -1,0 +1,27 @@
+{
+  "version": "0.5.0",
+  "tag": "v0.5.0",
+  "release_date": "2026-01-07",
+  "status": "released",
+  "changes": {
+    "added": [
+      "**Batch Processing**: Added batch processing functionality with `BatchProcessor` class",
+      "Enhanced batch processing example with argparse and tqdm dependency"
+    ],
+    "fixed": [
+      "Fixed type annotations in `BatchProcessor` and `BatchResults` classes",
+      "Improved mypy type checking with proper type annotations throughout codebase",
+      "Fixed broken `_extract_html_text` function definition",
+      "Resolved mypy unreachable statement errors with proper type assertions",
+      "Fixed release workflow to handle dynamic version in pyproject.toml"
+    ],
+    "changed": [
+      "Improved code formatting and style compliance (Black, Ruff)",
+      "Enhanced type safety across all modules"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.5.0/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.0"
+  }
+}

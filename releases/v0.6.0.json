@@ -1,0 +1,19 @@
+{
+  "version": "0.6.0",
+  "tag": "v0.6.0",
+  "release_date": "2026-01-14",
+  "status": "released",
+  "changes": {
+    "added": [
+      "**Major Reorganization**: Implemented comprehensive folder structure reorganization and validation system",
+      "**Enhanced Logging**: Updated logger imports to use centralized logger module"
+    ],
+    "changed": [
+      "Refactored project structure for better organization and maintainability"
+    ]
+  },
+  "artifacts": {
+    "pypi": "https://pypi.org/project/preocr/0.6.0/",
+    "github": "https://github.com/yuvaraj3855/preocr/releases/tag/v0.6.0"
+  }
+}
