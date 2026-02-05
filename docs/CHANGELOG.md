@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-02-06
+
+### Fixed
+- Fixed unused variable warnings (`table_counter`, `text_width`) in PDF extractor
+- Fixed mypy type errors: Added missing `document_type`, `pages_extracted`, `parent_id`, `reading_order`, and `parent_section_id` parameters
+- Fixed pydantic import errors in CI/CD workflows by installing dependencies before version extraction
+- Improved type annotations for list variables in extraction modules
+
+### Changed
+- Disabled `release.yml` workflow to avoid duplication (using `ci-cd-release.yml` exclusively)
+
 ## [1.0.0] - 2026-02-05
 
 ### Added
