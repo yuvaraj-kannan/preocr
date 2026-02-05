@@ -1054,7 +1054,6 @@ def _is_text_centered(chars: List[Dict[str, Any]], page_width: float) -> bool:
 
     x0 = min(char.get("x0", 0) for char in chars)
     x1 = max(char.get("x1", 0) for char in chars)
-    text_width = x1 - x0
     text_center = (x0 + x1) / 2
     page_center = page_width / 2
 
