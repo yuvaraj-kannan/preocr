@@ -1,9 +1,12 @@
 name: Release
 
+# DISABLED: Using ci-cd-release.yml for publishing instead
+# This workflow is kept for reference but disabled to avoid duplication
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:  # Keep manual trigger option but workflow won't auto-run
 
 jobs:
   version-validation:
