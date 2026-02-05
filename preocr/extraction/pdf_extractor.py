@@ -276,7 +276,6 @@ def _extract_with_pymupdf(
     all_images = []
     all_sections = []
     element_counter = 0
-    table_counter = 0
     form_counter = 0
     image_counter = 0
     section_counter = 0
