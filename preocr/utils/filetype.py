@@ -2,7 +2,7 @@
 
 import mimetypes
 from pathlib import Path
-from typing import Any, Dict, Optional, TypedDict
+from typing import Optional, TypedDict
 
 try:
     import magic

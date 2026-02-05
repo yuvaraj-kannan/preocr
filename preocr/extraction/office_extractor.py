@@ -1,11 +1,11 @@
 """Office document extraction with structured output."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Optional, Any
 
 from .. import exceptions
 from ..utils.logger import get_logger
-from .schemas import ExtractionResult, Element, Table, ElementType, BoundingBox, TableCell
+from .schemas import ExtractionResult, Element, Table, ElementType, TableCell
 from .base import generate_element_id, create_bbox, calculate_confidence
 
 OfficeDocumentError = exceptions.OfficeDocumentError
@@ -18,18 +18,21 @@ load_workbook: Optional[Any]
 
 try:
     from docx import Document as _Document
+
     Document = _Document
 except ImportError:
     Document = None
 
 try:
     from pptx import Presentation as _Presentation
+
     Presentation = _Presentation
 except ImportError:
     Presentation = None
 
 try:
     from openpyxl import load_workbook as _load_workbook
+
     load_workbook = _load_workbook
 except ImportError:
     load_workbook = None
@@ -63,14 +66,20 @@ def extract_office_native_data(
         file_type=extension.lstrip("."),
         extraction_method="native",
         overall_confidence=0.0,
+        document_type=None,
+        pages_extracted=None,
     )
 
     if extension == ".docx":
-        return _extract_docx(path, result, include_tables, include_metadata, include_structure, include_bbox)
+        return _extract_docx(
+            path, result, include_tables, include_metadata, include_structure, include_bbox
+        )
     elif extension == ".pptx":
         return _extract_pptx(path, result, include_metadata, include_structure, include_bbox)
     elif extension == ".xlsx":
-        return _extract_xlsx(path, result, include_tables, include_metadata, include_structure, include_bbox)
+        return _extract_xlsx(
+            path, result, include_tables, include_metadata, include_structure, include_bbox
+        )
     else:
         result.errors = [f"Unsupported office document type: {extension}"]
         return result
@@ -100,9 +109,11 @@ def _extract_docx(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "python-docx",
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "python-docx",
+                }
+            )
             if doc.core_properties:
                 props = doc.core_properties
                 if props.title:
@@ -110,7 +121,9 @@ def _extract_docx(
                 if props.author:
                     result.metadata["author"] = props.author
                 if props.created:
-                    result.metadata["created"] = props.created.isoformat() if props.created else None
+                    result.metadata["created"] = (
+                        props.created.isoformat() if props.created else None
+                    )
 
         # Extract paragraphs as elements
         for para_idx, paragraph in enumerate(doc.paragraphs):
@@ -152,6 +165,8 @@ def _extract_docx(
                 bbox=bbox,
                 confidence=confidence,
                 metadata={"style": paragraph.style.name if paragraph.style else None},
+                parent_id=None,
+                reading_order=None,
             )
 
             all_elements.append(element)
@@ -225,7 +240,9 @@ def _extract_docx(
 
     # Calculate overall confidence
     all_confidences = [e.confidence for e in all_elements] + [t.confidence for t in all_tables]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -258,10 +275,12 @@ def _extract_pptx(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "python-pptx",
-                "slide_count": len(prs.slides),
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "python-pptx",
+                    "slide_count": len(prs.slides),
+                }
+            )
             if prs.core_properties:
                 props = prs.core_properties
                 if props.title:
@@ -310,6 +329,8 @@ def _extract_pptx(
                     bbox=bbox,
                     confidence=confidence,
                     metadata={"slide_number": slide_idx + 1},
+                    parent_id=None,
+                    reading_order=None,
                 )
 
                 all_elements.append(element)
@@ -324,7 +345,9 @@ def _extract_pptx(
 
     # Calculate overall confidence
     all_confidences = [e.confidence for e in all_elements]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -357,10 +380,12 @@ def _extract_xlsx(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "openpyxl",
-                "sheet_count": len(wb.sheetnames),
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "openpyxl",
+                    "sheet_count": len(wb.sheetnames),
+                }
+            )
 
         # Extract each sheet as a table
         if include_tables:
@@ -413,7 +438,9 @@ def _extract_xlsx(
                         cells.append(cell_obj)
 
                 if cells:
-                    table_bbox = create_bbox(0, 0, max_col * 100.0, max_row * 20.0, sheet_idx + 1, 1000, 1000)
+                    table_bbox = create_bbox(
+                        0, 0, max_col * 100.0, max_row * 20.0, sheet_idx + 1, 1000, 1000
+                    )
 
                     table_obj = Table(
                         element_id=table_id,
@@ -441,7 +468,9 @@ def _extract_xlsx(
 
     # Calculate overall confidence
     all_confidences = [t.confidence for t in all_tables]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -450,4 +479,3 @@ def _extract_xlsx(
     }
 
     return result
-

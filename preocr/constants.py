@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 # Minimum text length to consider a file as having meaningful text
 MIN_TEXT_LENGTH = 50
 
@@ -27,33 +26,33 @@ LAYOUT_REFINEMENT_THRESHOLD = 0.9
 class Config:
     """
     Configuration class for PreOCR thresholds and settings.
-    
+
     This class allows customization of decision thresholds for OCR detection.
     All thresholds are optional and default to optimized values for general use.
-    
+
     Attributes:
         min_text_length: Minimum text length to consider a file as having meaningful text.
                         Files with less text will be flagged as needing OCR.
                         Default: 50 characters.
-        
+
         min_office_text_length: Minimum text length for office documents to skip OCR.
                                Office documents with less text will be flagged as needing OCR.
                                Default: 100 characters.
-        
+
         layout_refinement_threshold: Confidence threshold for triggering OpenCV layout analysis.
                                     If initial confidence is below this, use OpenCV for refinement.
                                     Default: 0.9 (90%).
-        
+
         high_confidence: Threshold for high confidence decisions. Default: 0.9.
-        
+
         medium_confidence: Threshold for medium confidence decisions. Default: 0.7.
-        
+
         low_confidence: Threshold for low confidence decisions. Default: 0.5.
-    
+
     Example:
         >>> # Use default thresholds
         >>> config = Config()
-        >>> 
+        >>>
         >>> # Customize thresholds for stricter detection
         >>> strict_config = Config(
         ...     min_text_length=100,
@@ -83,12 +82,10 @@ class Config:
             raise ValueError("medium_confidence must be between 0.0 and 1.0")
         if not 0.0 <= self.low_confidence <= 1.0:
             raise ValueError("low_confidence must be between 0.0 and 1.0")
-        
+
         # Ensure confidence thresholds are in order
         if not (self.low_confidence <= self.medium_confidence <= self.high_confidence):
-            raise ValueError(
-                "Confidence thresholds must be ordered: low <= medium <= high"
-            )
+            raise ValueError("Confidence thresholds must be ordered: low <= medium <= high")
 
 
 # Reason codes for structured decision tracking

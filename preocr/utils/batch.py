@@ -176,10 +176,10 @@ class BatchResults:
         if stats["processed"] > 0:
             print("\nOCR Decision:")
             print(
-                f"  Files needing OCR: {stats['needs_ocr']} ({stats['needs_ocr']/stats['processed']*100:.1f}%)"
+                f"  Files needing OCR: {stats['needs_ocr']} ({stats['needs_ocr'] / stats['processed'] * 100:.1f}%)"
             )
             print(
-                f"  Files ready (no OCR): {stats['no_ocr']} ({stats['no_ocr']/stats['processed']*100:.1f}%)"
+                f"  Files ready (no OCR): {stats['no_ocr']} ({stats['no_ocr'] / stats['processed'] * 100:.1f}%)"
             )
 
             # Page-level statistics
@@ -187,10 +187,10 @@ class BatchResults:
                 print("\nPage-Level Statistics:")
                 print(f"  Total pages processed: {stats['total_pages']}")
                 print(
-                    f"  Pages needing OCR: {stats['total_pages_needing_ocr']} ({stats['total_pages_needing_ocr']/stats['total_pages']*100:.1f}%)"
+                    f"  Pages needing OCR: {stats['total_pages_needing_ocr']} ({stats['total_pages_needing_ocr'] / stats['total_pages'] * 100:.1f}%)"
                 )
                 print(
-                    f"  Pages ready (no OCR): {stats['total_pages_with_text']} ({stats['total_pages_with_text']/stats['total_pages']*100:.1f}%)"
+                    f"  Pages ready (no OCR): {stats['total_pages_with_text']} ({stats['total_pages_with_text'] / stats['total_pages'] * 100:.1f}%)"
                 )
                 print(f"  Files with pages: {stats['files_with_pages']}")
 
@@ -299,7 +299,7 @@ class BatchProcessor:
         # Handle config: use provided config or create from individual parameters
         if config is None:
             config = Config()
-        
+
         # Override config values with individual parameters if provided
         if min_text_length is not None:
             config.min_text_length = min_text_length
@@ -313,7 +313,7 @@ class BatchProcessor:
             config.medium_confidence = medium_confidence
         if low_confidence is not None:
             config.low_confidence = low_confidence
-        
+
         self.config = config
 
         # Default extensions if not specified
@@ -527,8 +527,7 @@ class BatchProcessor:
             # Process without progress bar
             if progress and not TQDM_AVAILABLE:
                 logger.warning(
-                    "Progress bar requested but tqdm not installed. "
-                    "Install with: pip install tqdm"
+                    "Progress bar requested but tqdm not installed. Install with: pip install tqdm"
                 )
 
             with ProcessPoolExecutor(max_workers=self.max_workers) as executor:

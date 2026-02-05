@@ -1,8 +1,7 @@
 """PDF text extraction probe."""
 
-import io
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from .. import constants, exceptions
 from ..utils.logger import get_logger

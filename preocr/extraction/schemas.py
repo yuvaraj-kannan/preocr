@@ -42,7 +42,9 @@ class Element(BaseModel):
     element_type: ElementType = Field(..., description="Type of element")
     text: Optional[str] = Field(None, description="Extracted text content")
     bbox: BoundingBox = Field(..., description="Bounding box coordinates")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Extraction confidence (from Docugami)")
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Extraction confidence (from Docugami)"
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
     parent_id: Optional[str] = Field(None, description="Parent element ID (semantic relationship)")
     children_ids: List[str] = Field(default_factory=list, description="Child element IDs")
@@ -80,7 +82,9 @@ class FormField(BaseModel):
 
     element_id: str = Field(..., description="Unique field identifier")
     element_type: Literal[ElementType.FORM_FIELD] = ElementType.FORM_FIELD
-    field_name: Optional[str] = Field(None, description="Semantic field name (e.g., 'company_name')")
+    field_name: Optional[str] = Field(
+        None, description="Semantic field name (e.g., 'company_name')"
+    )
     field_type: str = Field(..., description="Field type: text, checkbox, radio, etc.")
     value: Optional[str] = Field(None, description="Field value")
     bbox: BoundingBox = Field(..., description="Field bounding box")
@@ -110,8 +114,12 @@ class ExtractionResult(BaseModel):
     file_path: str = Field(..., description="Path to source file")
     file_type: str = Field(..., description="File type: pdf, docx, etc.")
     extraction_method: str = Field(..., description="Extraction method: native or ocr")
-    document_type: Optional[str] = Field(None, description="Document classification (invoice, contract, etc.)")
-    overall_confidence: float = Field(..., ge=0.0, le=1.0, description="Overall extraction confidence")
+    document_type: Optional[str] = Field(
+        None, description="Document classification (invoice, contract, etc.)"
+    )
+    overall_confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Overall extraction confidence"
+    )
 
     # Elements (from Unstructured.io approach)
     elements: List[Element] = Field(default_factory=list, description="All extracted elements")
@@ -125,14 +133,18 @@ class ExtractionResult(BaseModel):
     sections: List[Section] = Field(default_factory=list, description="Document sections")
 
     # Reading order (from Docugami)
-    reading_order: List[str] = Field(default_factory=list, description="Element IDs in reading order")
+    reading_order: List[str] = Field(
+        default_factory=list, description="Element IDs in reading order"
+    )
 
     # Metadata
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
     pages_extracted: Optional[List[int]] = Field(None, description="Pages that were extracted")
 
     # Quality metrics
-    quality_metrics: Dict[str, Any] = Field(default_factory=dict, description="Extraction quality metrics")
+    quality_metrics: Dict[str, Any] = Field(
+        default_factory=dict, description="Extraction quality metrics"
+    )
 
     # Errors
     errors: List[str] = Field(default_factory=list, description="Extraction errors")
@@ -157,4 +169,3 @@ class ExtractionResult(BaseModel):
                 "errors": [],
             }
         }
-

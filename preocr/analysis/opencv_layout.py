@@ -1,7 +1,6 @@
 """OpenCV-based layout analysis for PDFs (used when confidence is low)."""
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, cast
+from typing import Any, Dict, Optional, cast
 
 from .. import exceptions
 from ..utils.logger import get_logger

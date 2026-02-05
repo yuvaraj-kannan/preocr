@@ -1,8 +1,7 @@
 """Output formatters for extraction results."""
 
-import json
 from typing import Union, Dict, Any
-from .schemas import ExtractionResult, Element, Table, FormField, Section, ElementType
+from .schemas import ExtractionResult, Table, ElementType
 
 
 def format_result(
@@ -26,7 +25,9 @@ def format_result(
     elif output_format == "markdown":
         return format_as_markdown(result)
     else:
-        raise ValueError(f"Unknown output format: {output_format}. Use 'pydantic', 'json', or 'markdown'")
+        raise ValueError(
+            f"Unknown output format: {output_format}. Use 'pydantic', 'json', or 'markdown'"
+        )
 
 
 def format_as_json(result: ExtractionResult) -> Dict[str, Any]:
@@ -194,4 +195,3 @@ def _format_table_as_markdown(table: Table) -> str:
             lines.append(row_text)
 
     return "\n".join(lines)
-

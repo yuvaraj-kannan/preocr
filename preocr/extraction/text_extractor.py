@@ -1,11 +1,11 @@
 """Text and HTML extraction with structured output."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Optional, Any
 
 from .. import exceptions
 from ..utils.logger import get_logger
-from .schemas import ExtractionResult, Element, ElementType, BoundingBox
+from .schemas import ExtractionResult, Element, ElementType
 from .base import generate_element_id, create_bbox, calculate_confidence
 
 TextExtractionError = exceptions.TextExtractionError
@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 BeautifulSoup: Optional[Any]
 try:
     from bs4 import BeautifulSoup as _BeautifulSoup
+
     BeautifulSoup = _BeautifulSoup
 except ImportError:
     BeautifulSoup = None
@@ -46,6 +47,8 @@ def extract_text_native_data(
         file_type=extension.lstrip(".") if extension else "txt",
         extraction_method="native",
         overall_confidence=0.0,
+        document_type=None,
+        pages_extracted=None,
     )
 
     if extension in [".html", ".htm"]:
@@ -74,15 +77,19 @@ def _extract_html(
 
         if BeautifulSoup is None:
             # Fallback: treat as plain text
-            return _extract_plain_text(path, result, include_metadata, include_structure, include_bbox)
+            return _extract_plain_text(
+                path, result, include_metadata, include_structure, include_bbox
+            )
 
         soup = BeautifulSoup(content, "html.parser")
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "beautifulsoup4",
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "beautifulsoup4",
+                }
+            )
             if soup.title:
                 result.metadata["title"] = soup.title.string
             if soup.find("meta", {"name": "author"}):
@@ -127,6 +134,8 @@ def _extract_html(
                     bbox=bbox,
                     confidence=confidence,
                     metadata={"tag": heading_tag},
+                    parent_id=None,
+                    reading_order=None,
                 )
 
                 all_elements.append(element)
@@ -163,6 +172,8 @@ def _extract_html(
                 bbox=bbox,
                 confidence=confidence,
                 metadata={"tag": "p"},
+                parent_id=None,
+                reading_order=None,
             )
 
             all_elements.append(element)
@@ -201,6 +212,8 @@ def _extract_html(
                         bbox=bbox,
                         confidence=confidence,
                         metadata={"tag": "li"},
+                        parent_id=None,
+                        reading_order=None,
                     )
 
                     all_elements.append(element)
@@ -216,7 +229,9 @@ def _extract_html(
 
     # Calculate overall confidence
     all_confidences = [e.confidence for e in all_elements]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -253,10 +268,12 @@ def _extract_csv(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "csv",
-                "row_count": len(rows),
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "csv",
+                    "row_count": len(rows),
+                }
+            )
 
         # Create table from CSV
         table_id = generate_element_id("table_0")
@@ -323,7 +340,9 @@ def _extract_csv(
 
     # Calculate overall confidence
     all_confidences = [t.confidence for t in all_tables]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -374,10 +393,12 @@ def _extract_plain_text(
 
         # Extract metadata
         if include_metadata:
-            result.metadata.update({
-                "extraction_method": "plain_text",
-                "encoding": encoding,
-            })
+            result.metadata.update(
+                {
+                    "extraction_method": "plain_text",
+                    "encoding": encoding,
+                }
+            )
 
         # Split into lines and create elements
         lines = text.split("\n")
@@ -411,6 +432,8 @@ def _extract_plain_text(
                 bbox=bbox,
                 confidence=confidence,
                 metadata={"line_number": line_idx + 1},
+                parent_id=None,
+                reading_order=None,
             )
 
             all_elements.append(element)
@@ -425,7 +448,9 @@ def _extract_plain_text(
 
     # Calculate overall confidence
     all_confidences = [e.confidence for e in all_elements]
-    result.overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    result.overall_confidence = (
+        sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+    )
 
     # Quality metrics
     result.quality_metrics = {
@@ -434,4 +459,3 @@ def _extract_plain_text(
     }
 
     return result
-

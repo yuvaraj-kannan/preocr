@@ -1,7 +1,7 @@
 """Signal collection and aggregation for OCR detection."""
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from ..utils.filetype import FileTypeInfo
 
