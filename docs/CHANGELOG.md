@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-05
+
+### Added
+- **Structured Data Extraction**: Comprehensive machine-readable document extraction system with support for PDFs, Office documents (DOCX, PPTX, XLSX), and text files
+- **Element-Based Structure**: Rich element extraction with classification (Title, NarrativeText, Table, Header, Footer, Image, etc.)
+- **Confidence Scoring**: Per-element confidence scores for all extracted content
+- **Bounding Boxes**: Precise coordinate information (x0, y0, x1, y1) for all elements
+- **Table Extraction**: Advanced table extraction with cell-level metadata and spanning support
+- **Form Field Detection**: Form field extraction with semantic naming and type detection
+- **Image Detection**: Image location and metadata extraction
+- **Section Detection**: Hierarchical section detection with parent-child relationships
+- **Reading Order**: Logical reading order for all extracted elements
+- **Multiple Output Formats**: Support for Pydantic models, JSON, and Markdown (LLM-ready) output formats
+- **Release Management System**: Automated release folder structure with versioned release notes and CI/CD integration
+
+### Changed
+- **API Enhancement**: Added `extract_native_data()` function for structured data extraction from machine-readable documents
+- **Documentation**: Comprehensive release management documentation and guidelines
+- **CI/CD Integration**: Enhanced workflows for automated release file generation and validation
+
+### Fixed
+- Improved type safety across all extraction modules
+- Enhanced error handling in extraction pipeline
+
+## [0.7.0] - 2026-01-14
+
+### Added
+- **Configuration Class**: Added `Config` class for customizable OCR detection thresholds, allowing users to fine-tune sensitivity and decision criteria
+
+## [0.6.0] - 2026-01-14
+
+### Added
+- **Major Reorganization**: Implemented comprehensive folder structure reorganization and validation system
+- **Enhanced Logging**: Updated logger imports to use centralized logger module
+
+### Changed
+- Refactored project structure for better organization and maintainability
+
+## [0.5.3] - 2026-01-10
+
+### Changed
+- Refined CI/CD release conditions to include additional skip checks
+- Improved release workflow automation
+
+## [0.5.2] - 2026-01-10
+
+### Changed
+- Enhanced release workflow with GitHub release creation and version verification
+- Improved CI/CD pipeline reliability
+
+## [0.5.1] - 2026-01-07
+
+### Added
+- **CI/CD Release Pipeline**: Added automatic version bump and PyPI publishing workflow
+- **PyPI Publishing**: Added PyPI API token support as fallback for publishing
+- Enhanced batch processing documentation and examples
+- Improved README with batch processing feature highlights
+
+### Fixed
+- Fixed release workflow permissions and PyPI publishing configuration
+- Improved CI/CD workflow version bump detection
+- Enhanced test automation workflow documentation
+
+### Changed
+- Updated lint workflow to auto-format instead of failing on formatting issues
+- Improved batch processing documentation
+
+## [0.5.0] - 2026-01-07
+
+### Added
+- **Batch Processing**: Added batch processing functionality with `BatchProcessor` class
+- Enhanced batch processing example with argparse and tqdm dependency
+
+### Fixed
+- Fixed type annotations in `BatchProcessor` and `BatchResults` classes
+- Improved mypy type checking with proper type annotations throughout codebase
+- Fixed broken `_extract_html_text` function definition
+- Resolved mypy unreachable statement errors with proper type assertions
+- Fixed release workflow to handle dynamic version in pyproject.toml
+
+### Changed
+- Improved code formatting and style compliance (Black, Ruff)
+- Enhanced type safety across all modules
+
 ## [0.4.0] - 2024-12-31
 
 ### Added
@@ -133,7 +217,17 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.0
+[0.7.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.7.0
+[0.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.6.0
+[0.5.3]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.3
+[0.5.2]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.2
+[0.5.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.1
+[0.5.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.5.0
+[0.4.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.4.0
+[0.3.2]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.2
+[0.3.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.1
 [0.3.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.3.0
 [0.2.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.2.0
 [0.1.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.1.1
