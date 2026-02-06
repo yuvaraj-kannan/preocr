@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed PyPI wheel packaging issue: Missing subpackages (core/, utils/, analysis/, probes/, extraction/) now included in distribution
+- Added explicit `py.typed` marker file inclusion for type checker support
+- Improved package discovery configuration using `packages = {find = {}}` for automatic subpackage detection
+
+## [1.0.3] - 2026-02-06
+
+### Fixed
+- Fixed BatchProcessor skipped_files tracking bug
+
+### Changed
+- Merge pull request #24 from yuvaraj3855/fix-batch-processor-skipped-files
+
+## [1.0.2] - 2026-02-06
+
+### Fixed
+- Improvement
+- Bug fixed
+
+### Changed
+- Merge pull request #23 from yuvaraj3855/feature/extraction-improvements
+- Merge pull request #22 from yuvaraj3855/docs/readme-api-fixes
+
 ## [1.0.1] - 2026-02-06
 
 ### Fixed
@@ -228,7 +251,10 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.3
+[1.0.2]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.2
+[1.0.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.1
 [1.0.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.0
 [0.7.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.7.0
 [0.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v0.6.0
