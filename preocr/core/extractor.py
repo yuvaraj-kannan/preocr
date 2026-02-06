@@ -27,6 +27,7 @@ def extract_native_data(
     include_bbox: bool = True,
     pages: Optional[List[int]] = None,
     output_format: str = "pydantic",
+    markdown_clean: Optional[bool] = None,
     config: Optional[Config] = None,
 ) -> Union[ExtractionResult, Dict[str, Any], str]:
     """
@@ -45,6 +46,9 @@ def extract_native_data(
         include_bbox: Whether to include bounding box coordinates (default: True)
         pages: Optional list of page numbers to extract (1-indexed). If None, extracts all pages.
         output_format: Output format - "pydantic" (default), "json", or "markdown"
+        markdown_clean: If True and output_format="markdown", output only content without metadata
+                        (no file paths, confidence scores, bounding boxes, etc.).
+                        If None (default), automatically uses clean mode when include_metadata=False
         config: Optional Config object (currently unused, reserved for future use)
 
     Returns:
@@ -60,8 +64,11 @@ def extract_native_data(
         >>> # Extract specific pages as JSON
         >>> json_data = extract_native_data("document.pdf", pages=[1, 2], output_format="json")
         >>>
-        >>> # Extract as markdown for LLM consumption
+        >>> # Extract as markdown for LLM consumption (with metadata)
         >>> markdown = extract_native_data("document.pdf", output_format="markdown")
+        >>>
+        >>> # Extract as clean markdown (content only, no metadata)
+        >>> clean_markdown = extract_native_data("document.pdf", output_format="markdown", markdown_clean=True)
     """
     path = Path(file_path)
 
@@ -126,4 +133,9 @@ def extract_native_data(
         )
 
     # Format output
-    return format_result(result, output_format=output_format)
+    return format_result(
+        result, 
+        output_format=output_format, 
+        markdown_clean=markdown_clean,
+        include_metadata=include_metadata
+    )

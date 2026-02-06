@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-02-06
+
+### Added
+- **Clean Markdown Output**: Added automatic clean markdown mode when `include_metadata=False` for LLM-ready content without technical metadata
+- **Markdown Clean Parameter**: Added `markdown_clean` parameter to `extract_native_data()` for explicit control over markdown formatting
+- Clean markdown output excludes file paths, confidence scores, bounding boxes, and other metadata - perfect for LLM consumption
+
+### Changed
+- Markdown formatter now automatically uses clean mode when `include_metadata=False` (no need for separate parameter)
+- Improved markdown output formatting to respect extraction flags
+
+## [1.0.4] - 2026-02-06
+
 ### Fixed
 - Fixed PyPI wheel packaging issue: Missing subpackages (core/, utils/, analysis/, probes/, extraction/) now included in distribution
 - Added explicit `py.typed` marker file inclusion for type checker support
@@ -251,7 +264,9 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.5
+[1.0.4]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.4
 [1.0.3]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.3
 [1.0.2]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.2
 [1.0.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.1
