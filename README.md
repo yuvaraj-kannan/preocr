@@ -127,12 +127,13 @@ for element in result.elements:
 
 # Access tables
 for table in result.tables:
-    print(f"Table with {len(table.rows)} rows")
-    for row in table.rows:
-        print(f"  {[cell.text for cell in row]}")
+    print(f"Table with {table.rows} rows × {table.columns} columns")
+    # Access table cells
+    for cell in table.cells:
+        print(f"  Cell [{cell.row}, {cell.col}]: {cell.text}")
 
 # Export to Markdown (LLM-ready)
-markdown = result.to_markdown()
+markdown = extract_native_data("document.pdf", output_format="markdown")
 print(markdown)
 ```
 
@@ -749,6 +750,42 @@ Batch processor for efficiently processing multiple files with parallel processi
 - `errors` (list): List of error dictionaries for failed files
 - `get_statistics() -> dict`: Get comprehensive statistics about the batch
 - `print_summary()`: Print formatted summary to console
+
+### `extract_native_data(file_path, include_tables=True, include_forms=True, include_metadata=True, include_structure=True, include_images=True, include_bbox=True, pages=None, output_format="pydantic", config=None)`
+
+Extract structured data from machine-readable documents (PDFs, Office docs, text files).
+
+**Parameters:**
+- `file_path` (str or Path): Path to the file to extract data from
+- `include_tables` (bool): Whether to extract tables (default: `True`)
+- `include_forms` (bool): Whether to extract form fields (default: `True`)
+- `include_metadata` (bool): Whether to include document metadata (default: `True`)
+- `include_structure` (bool): Whether to detect sections and reading order (default: `True`)
+- `include_images` (bool): Whether to detect images (default: `True`)
+- `include_bbox` (bool): Whether to include bounding box coordinates (default: `True`)
+- `pages` (list, optional): Optional list of page numbers to extract (1-indexed). If `None`, extracts all pages
+- `output_format` (str): Output format - `"pydantic"` (default), `"json"`, or `"markdown"`
+- `config` (Config, optional): Configuration object (currently unused, reserved for future use)
+
+**Returns:**
+- `ExtractionResult` (Pydantic model) if `output_format="pydantic"`
+- `Dict[str, Any]` if `output_format="json"`
+- `str` (Markdown) if `output_format="markdown"`
+
+**Example:**
+```python
+from preocr import extract_native_data
+
+# Extract as Pydantic model
+result = extract_native_data("document.pdf")
+print(result.overall_confidence)
+
+# Extract specific pages as JSON
+json_data = extract_native_data("document.pdf", pages=[1, 2], output_format="json")
+
+# Extract as markdown for LLM consumption
+markdown = extract_native_data("document.pdf", output_format="markdown")
+```
 
 ### `BatchResults`
 
