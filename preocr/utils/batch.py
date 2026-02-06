@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from .. import constants
 from ..core.detector import needs_ocr
@@ -369,7 +369,7 @@ class BatchProcessor:
         except Exception as e:
             logger.warning(f"Failed to load resume file: {e}")
 
-    def _collect_files(self, directory: Union[str, Path]) -> List[Path]:
+    def _collect_files(self, directory: Union[str, Path]) -> Tuple[List[Path], int]:
         """
         Collect files to process from directory.
 
@@ -377,7 +377,7 @@ class BatchProcessor:
             directory: Directory to scan
 
         Returns:
-            List of file paths to process
+            Tuple of (list of file paths to process, number of skipped files)
         """
         dir_path = Path(directory)
         if not dir_path.exists():
@@ -421,11 +421,14 @@ class BatchProcessor:
                     continue
             files = filtered_files
 
-        # Filter out already processed files (for resume)
+        # Filter out already processed files (for resume) and count skipped
+        skipped_count = 0
         if self._processed_files:
+            all_files_count = len(files)
             files = [f for f in files if str(f) not in self._processed_files]
+            skipped_count = all_files_count - len(files)
 
-        return files
+        return files, skipped_count
 
     def process_directory(
         self,
@@ -446,8 +449,9 @@ class BatchProcessor:
         results.start_time = time.time()
 
         # Collect files
-        files = self._collect_files(directory)
+        files, skipped_count = self._collect_files(directory)
         results.total_files = len(files)
+        results.skipped_files = skipped_count
 
         if not files:
             logger.info("No files found to process")
