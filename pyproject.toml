@@ -78,7 +78,11 @@ Repository = "https://github.com/yuvaraj3855/preocr"
 Issues = "https://github.com/yuvaraj3855/preocr/issues"
 
 [tool.setuptools]
-packages = ["preocr"]
+packages = {find = {exclude = ["examples*", "scripts*", "tests*", "venv*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+preocr = ["py.typed"]
 
 [tool.setuptools.dynamic]
 version = {attr = "preocr.version.__version__"}
