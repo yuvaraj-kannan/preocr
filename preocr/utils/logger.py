@@ -106,7 +106,7 @@ def suppress_pdf_warnings() -> Iterator[None]:
             # Filter out PyMuPDF color warnings
             if "Cannot set gray" in text or "invalid float value" in text or "/'Pat" in text:
                 return len(text)  # Pretend we wrote it (suppress)
-            return self.original_stderr.write(text)
+            return int(self.original_stderr.write(text))
         
         def flush(self):
             self.original_stderr.flush()

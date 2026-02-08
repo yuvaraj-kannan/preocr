@@ -103,8 +103,8 @@ def calculate_confidence_from_signals(
     # Priority 2: Layout-based (if layout data available)
     layout_type = signals.get("layout_type")
     if layout_type and layout_type != "unknown":
-        text_coverage = signals.get("text_coverage", 0.0)
-        image_coverage = signals.get("image_coverage", 0.0)
+        text_coverage = float(signals.get("text_coverage", 0.0))
+        image_coverage = float(signals.get("image_coverage", 0.0))
         
         if needs_ocr:
             # More images = higher confidence
