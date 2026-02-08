@@ -1,16 +1,26 @@
 """Example: Using layout-aware detection for improved accuracy."""
 
+from pathlib import Path
 from preocr import needs_ocr
 
 
 def main():
     """Demonstrate layout-aware OCR detection."""
+    
+    # Use a real PDF file from the data-source-formats directory
+    sample_file = Path(__file__).parent.parent / "data-source-formats" / "product-manual.pdf"
+    
+    if not sample_file.exists():
+        print(f"Error: Sample file not found: {sample_file}")
+        print("Please ensure the data-source-formats directory contains PDF files.")
+        return
 
     # Example 1: Basic usage (no layout analysis)
     print("=" * 60)
     print("Example 1: Basic Detection (No Layout Analysis)")
     print("=" * 60)
-    result = needs_ocr("document.pdf")
+    print(f"File: {sample_file.name}")
+    result = needs_ocr(str(sample_file))
     print(f"Needs OCR: {result['needs_ocr']}")
     print(f"Reason: {result['reason']}")
     print(f"Confidence: {result['confidence']}")
@@ -20,7 +30,8 @@ def main():
     print("=" * 60)
     print("Example 2: Layout-Aware Detection")
     print("=" * 60)
-    result = needs_ocr("document.pdf", layout_aware=True)
+    print(f"File: {sample_file.name}")
+    result = needs_ocr(str(sample_file), layout_aware=True)
     print(f"Needs OCR: {result['needs_ocr']}")
     print(f"Reason: {result['reason']}")
     print(f"Confidence: {result['confidence']}")
@@ -40,7 +51,8 @@ def main():
     print("=" * 60)
     print("Example 3: Layout-Aware + Page-Level Analysis")
     print("=" * 60)
-    result = needs_ocr("document.pdf", page_level=True, layout_aware=True)
+    print(f"File: {sample_file.name}")
+    result = needs_ocr(str(sample_file), page_level=True, layout_aware=True)
     print(f"Needs OCR: {result['needs_ocr']}")
     print(f"Reason: {result['reason']}")
 

@@ -64,6 +64,26 @@ def needs_ocr(
             - pages: (if page_level=True for PDFs) Page-level analysis results
             - layout: (if layout_aware=True for PDFs) Layout analysis results
 
+    Note on Confidence Scores:
+        Confidence scores may vary between page_level=True and page_level=False modes:
+        
+        - **Without page_level**: Confidence is calculated based on document-level heuristics
+          and OpenCV analysis (if triggered). Typical range: 0.60-0.95.
+        
+        - **With page_level=True**: Confidence is calculated as the average of per-page
+          confidence scores, adjusted for consistency. For mixed documents (some pages
+          need OCR, some don't), confidence may be lower due to the averaging effect.
+          Typical range: 0.60-0.95, but may be lower for mixed documents.
+        
+        - **Why the difference**: Page-level analysis provides more granular information
+          but averages confidence across pages. Document-level analysis uses overall
+          text extraction and layout analysis, which can be more confident for uniform
+          documents.
+        
+        Both modes are accurate; the difference reflects the analysis granularity.
+        Use page_level=True when you need per-page decisions, otherwise use the
+        default (page_level=False) for faster, document-level decisions.
+
     Example:
         >>> result = needs_ocr("document.pdf")
         >>> if result["needs_ocr"]:
@@ -165,6 +185,9 @@ def needs_ocr(
             progress_callback("opencv_analysis", 0.7)
         opencv_result = opencv_layout_module.analyze_with_opencv(str(path), page_level=page_level)
         if opencv_result:
+            # Add OpenCV results to signals BEFORE refining (so hybrid rule can use it)
+            collected_signals["opencv_layout"] = opencv_result
+            
             # Refine decision based on OpenCV analysis
             needs_ocr_flag, reason, confidence, category, reason_code = decision.refine_with_opencv(
                 collected_signals,
@@ -176,8 +199,6 @@ def needs_ocr(
                 reason_code,
                 config=config,
             )
-            # Add OpenCV results to signals for debugging
-            collected_signals["opencv_layout"] = opencv_result
 
     # Step 6: Determine file type category for user
     file_type_category = _get_file_type_category(mime, extension)
@@ -195,16 +216,34 @@ def needs_ocr(
 
     # Add page-level results if available
     if page_analysis and "pages" in page_analysis:
-        result["pages"] = page_analysis.get("pages", [])
-        result["page_count"] = page_analysis.get("page_count", 0)
-        result["pages_needing_ocr"] = page_analysis.get("pages_needing_ocr", 0)
-        result["pages_with_text"] = page_analysis.get("pages_with_text", 0)
-        # Override overall decision with page-level analysis if available
-        if page_analysis.get("overall_needs_ocr") is not None:
-            result["needs_ocr"] = page_analysis["overall_needs_ocr"]
-            result["confidence"] = page_analysis["overall_confidence"]
-            result["reason_code"] = page_analysis["overall_reason_code"]
-            result["reason"] = page_analysis["overall_reason"]
+        page_count = page_analysis.get("page_count", 0)
+        pages_list = page_analysis.get("pages", [])
+        
+        # Only add page-level data if it's valid
+        if page_count > 0 and len(pages_list) > 0:
+            result["pages"] = pages_list
+            result["page_count"] = page_count
+            result["pages_needing_ocr"] = page_analysis.get("pages_needing_ocr", 0)
+            result["pages_with_text"] = page_analysis.get("pages_with_text", 0)
+            
+            # Override overall decision with page-level analysis only if data is valid
+            if page_analysis.get("overall_needs_ocr") is not None:
+                # Validate that page-level analysis is complete and consistent
+                if len(pages_list) == page_count:
+                    result["needs_ocr"] = page_analysis["overall_needs_ocr"]
+                    result["confidence"] = page_analysis["overall_confidence"]
+                    result["reason_code"] = page_analysis["overall_reason_code"]
+                    result["reason"] = page_analysis["overall_reason"]
+                else:
+                    logger.warning(
+                        f"Page-level analysis incomplete: {len(pages_list)} pages found, "
+                        f"but page_count is {page_count}. Using document-level decision."
+                    )
+        else:
+            logger.debug(
+                f"Page-level analysis invalid: page_count={page_count}, "
+                f"pages_list length={len(pages_list)}. Using document-level decision."
+            )
 
     # Add layout analysis results if available (from pdfplumber-based analyzer)
     if layout_result:

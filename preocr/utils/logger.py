@@ -2,6 +2,9 @@
 
 import logging
 import os
+import warnings
+from contextlib import contextmanager
+from typing import Iterator
 
 # Default log level
 _DEFAULT_LOG_LEVEL = logging.WARNING
@@ -76,3 +79,80 @@ def set_log_level(level: int) -> None:
     logger.setLevel(level)
     for handler in logger.handlers:
         handler.setLevel(level)
+
+
+@contextmanager
+def suppress_pdf_warnings() -> Iterator[None]:
+    """
+    Context manager to suppress common PDF library warnings.
+
+    Suppresses warnings from pdfplumber, PyMuPDF, and other PDF processing libraries
+    that are not critical for functionality (e.g., "Cannot set gray non-stroke color").
+
+    Note: PyMuPDF prints some warnings directly to stderr, which we filter.
+
+    Example:
+        >>> with suppress_pdf_warnings():
+        ...     result = extract_pdf_text("file.pdf")
+    """
+    import sys
+    import io
+    
+    # Create a filter class for stderr that suppresses PyMuPDF color warnings
+    class StderrFilter:
+        def __init__(self, original_stderr):
+            self.original_stderr = original_stderr
+        
+        def write(self, text: str) -> int:
+            # Filter out PyMuPDF color warnings
+            if "Cannot set gray" in text or "invalid float value" in text or "/'Pat" in text:
+                return len(text)  # Pretend we wrote it (suppress)
+            return self.original_stderr.write(text)
+        
+        def flush(self):
+            self.original_stderr.flush()
+        
+        def __getattr__(self, name):
+            return getattr(self.original_stderr, name)
+    
+    # Suppress Python warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", message=".*gray.*non-stroke.*color.*")
+        warnings.filterwarnings("ignore", message=".*invalid float value.*")
+        warnings.filterwarnings("ignore", message=".*Pat.*")
+        
+        # Redirect stderr to filter
+        original_stderr = sys.stderr
+        filtered_stderr = StderrFilter(original_stderr)
+        sys.stderr = filtered_stderr
+        
+        # Also suppress warnings from pdfplumber/PyMuPDF modules via logging
+        try:
+            import pdfplumber
+            pdfplumber_logger = logging.getLogger("pdfplumber")
+            original_pdfplumber_level = pdfplumber_logger.level
+            pdfplumber_logger.setLevel(logging.ERROR)
+        except ImportError:
+            pdfplumber_logger = None
+            original_pdfplumber_level = None
+        
+        try:
+            import fitz  # PyMuPDF
+            pymupdf_logger = logging.getLogger("fitz")
+            pymupdf_original_level = pymupdf_logger.level
+            pymupdf_logger.setLevel(logging.ERROR)
+        except ImportError:
+            pymupdf_logger = None
+            pymupdf_original_level = None
+        
+        try:
+            yield
+        finally:
+            # Restore original stderr
+            sys.stderr = original_stderr
+            # Restore original log levels
+            if pdfplumber_logger and original_pdfplumber_level is not None:
+                pdfplumber_logger.setLevel(original_pdfplumber_level)
+            if pymupdf_logger and pymupdf_original_level is not None:
+                pymupdf_logger.setLevel(pymupdf_original_level)
