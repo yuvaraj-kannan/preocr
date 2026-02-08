@@ -49,6 +49,10 @@ class Config:
 
         low_confidence: Threshold for low confidence decisions. Default: 0.5.
 
+        use_ocr_score_confidence: If True, use OCR_SCORE-based confidence calculation when available.
+                                  This aligns confidence scores with the scoring model for more
+                                  meaningful confidence values. Default: True.
+
     Example:
         >>> # Use default thresholds
         >>> config = Config()
@@ -67,6 +71,7 @@ class Config:
     high_confidence: float = HIGH_CONFIDENCE
     medium_confidence: float = MEDIUM_CONFIDENCE
     low_confidence: float = LOW_CONFIDENCE
+    use_ocr_score_confidence: bool = True
 
     def __post_init__(self) -> None:
         """Validate threshold values."""

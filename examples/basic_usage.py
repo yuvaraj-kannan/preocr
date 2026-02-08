@@ -1,28 +1,35 @@
 """Basic usage example for PreOCR."""
 
+from pathlib import Path
 from preocr import needs_ocr
 
 
 def main():
     """Demonstrate basic PreOCR usage."""
-    # Example file paths (replace with your actual files)
+    # Use real files from the data-source-formats directory
+    data_dir = Path(__file__).parent.parent / "data-source-formats"
+    
     files = [
-        "document.pdf",
-        "image.png",
-        "report.docx",
-        "data.txt",
+        data_dir / "product-manual.pdf",
+        data_dir / "Multiturn-ContosoBenefits.pdf",
+        data_dir / "structured.docx",
+        data_dir / "Scenario_Responses_Friendly.tsv",
     ]
 
     print("PreOCR - Basic Usage Example\n")
     print("=" * 50)
 
     for file_path in files:
+        if not file_path.exists():
+            print(f"\n⚠️  File not found: {file_path.name} (skipping)")
+            continue
+            
         try:
-            result = needs_ocr(file_path)
+            result = needs_ocr(str(file_path))
 
             status = "✅ NO OCR" if not result["needs_ocr"] else "🔍 NEEDS OCR"
 
-            print(f"\nFile: {file_path}")
+            print(f"\nFile: {file_path.name}")
             print(f"Status: {status}")
             print(f"Type: {result['file_type']}")
             print(f"Category: {result['category']}")

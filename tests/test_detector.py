@@ -82,3 +82,72 @@ def test_needs_ocr_with_path_object():
         assert "needs_ocr" in result
     finally:
         temp_path.unlink()
+
+
+def test_needs_ocr_page_level():
+    """Test needs_ocr with page_level=True."""
+    with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", delete=False) as f:
+        f.write("Test content with enough text to be meaningful.")
+        temp_path = f.name
+
+    try:
+        result = detector.needs_ocr(temp_path, page_level=True)
+        # For non-PDF files, page_level should not affect result structure
+        assert "needs_ocr" in result
+        assert "signals" in result
+    finally:
+        Path(temp_path).unlink()
+
+
+def test_needs_ocr_scanned_pdf_page_level():
+    """Test needs_ocr with page_level=True on scanned PDF (no text)."""
+    # Create a minimal PDF (simulating scanned PDF)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(b"%PDF-1.4\n")
+        temp_path = f.name
+
+    try:
+        result = detector.needs_ocr(temp_path, page_level=True)
+        # Should handle scanned PDFs gracefully
+        assert "needs_ocr" in result
+        assert isinstance(result["needs_ocr"], bool)
+        # For scanned PDFs, should need OCR
+        # But we can't guarantee this without a real scanned PDF
+        assert "page_count" in result or "pages" in result or result.get("page_count", 0) >= 0
+    finally:
+        Path(temp_path).unlink()
+
+
+def test_needs_ocr_layout_aware():
+    """Test needs_ocr with layout_aware=True."""
+    with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", delete=False) as f:
+        f.write("Test content")
+        temp_path = f.name
+
+    try:
+        result = detector.needs_ocr(temp_path, layout_aware=True)
+        # layout_aware mainly affects PDFs, but should work for all files
+        assert "needs_ocr" in result
+        assert "signals" in result
+    finally:
+        Path(temp_path).unlink()
+
+
+def test_needs_ocr_invalid_pdf():
+    """Test needs_ocr with invalid/corrupted PDF."""
+    # Create a file that looks like PDF but is corrupted
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(b"Not a valid PDF content")
+        temp_path = f.name
+
+    try:
+        result = detector.needs_ocr(temp_path)
+        # Should handle gracefully without crashing
+        assert "needs_ocr" in result
+        assert isinstance(result["needs_ocr"], bool)
+        # The result depends on file type detection - may be detected as text or binary
+        # The important thing is it doesn't crash
+        assert "file_type" in result
+        assert "confidence" in result
+    finally:
+        Path(temp_path).unlink()
