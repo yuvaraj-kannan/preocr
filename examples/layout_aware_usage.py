@@ -38,7 +38,7 @@ def main():
 
     if "layout" in result:
         layout = result["layout"]
-        print(f"\nLayout Analysis:")
+        print("\nLayout Analysis:")
         print(f"  Layout Type: {layout['layout_type']}")
         print(f"  Text Coverage: {layout['text_coverage']}%")
         print(f"  Image Coverage: {layout['image_coverage']}%")
@@ -57,7 +57,7 @@ def main():
     print(f"Reason: {result['reason']}")
 
     if "pages" in result and "layout" in result:
-        print(f"\nPage-Level Layout Analysis:")
+        print("\nPage-Level Layout Analysis:")
         for page in result["pages"]:
             page_num = page["page_number"]
             needs_ocr_page = page["needs_ocr"]

@@ -96,7 +96,6 @@ def suppress_pdf_warnings() -> Iterator[None]:
         ...     result = extract_pdf_text("file.pdf")
     """
     import sys
-    import io
     
     # Create a filter class for stderr that suppresses PyMuPDF color warnings
     class StderrFilter:
@@ -129,7 +128,7 @@ def suppress_pdf_warnings() -> Iterator[None]:
         
         # Also suppress warnings from pdfplumber/PyMuPDF modules via logging
         try:
-            import pdfplumber
+            import pdfplumber  # noqa: F401
             pdfplumber_logger = logging.getLogger("pdfplumber")
             original_pdfplumber_level = pdfplumber_logger.level
             pdfplumber_logger.setLevel(logging.ERROR)
@@ -138,7 +137,7 @@ def suppress_pdf_warnings() -> Iterator[None]:
             original_pdfplumber_level = None
         
         try:
-            import fitz  # PyMuPDF
+            import fitz  # PyMuPDF  # noqa: F401
             pymupdf_logger = logging.getLogger("fitz")
             pymupdf_original_level = pymupdf_logger.level
             pymupdf_logger.setLevel(logging.ERROR)
