@@ -1409,7 +1409,6 @@ def _merge_line_items(
             # (since we're reading upwards, current is above item)
             current_top = current.get("top", current.get("y0", 0))
             current_bottom = current.get("bottom", current.get("y1", 0))
-            item_top = item.get("top", item.get("y0", 0))
             item_bottom = item.get("bottom", item.get("y1", 0))
             gap = current_top - item_bottom  # Positive if current is above item
             
