@@ -349,8 +349,8 @@ def _contours_overlap(contour1, contour2, overlap_threshold: float = 0.3) -> boo
 
     try:
         # Get bounding boxes
-        x1, y1, w1, h1 = _cv2.boundingRect(contour1)
-        x2, y2, w2, h2 = _cv2.boundingRect(contour2)
+        x1, y1, w1, h1 = cv2.boundingRect(contour1)
+        x2, y2, w2, h2 = cv2.boundingRect(contour2)
 
         # Calculate intersection
         x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))

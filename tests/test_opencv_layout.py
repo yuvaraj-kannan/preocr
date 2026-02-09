@@ -120,15 +120,21 @@ def test_analyze_layout_structure():
     test_img[10:30, 10:30] = 255  # Some white region
 
     with patch("preocr.opencv_layout.cv2") as mock_cv2:
-        mock_cv2.threshold.return_value = (127, test_img)
+        mock_cv2.ADAPTIVE_THRESH_GAUSSIAN_C = 1
+        mock_cv2.THRESH_BINARY_INV = 0
+        mock_cv2.MORPH_RECT = 0
+        mock_cv2.RETR_EXTERNAL = 0
+        mock_cv2.CHAIN_APPROX_SIMPLE = 0
+        mock_cv2.adaptiveThreshold.return_value = test_img
         mock_cv2.getStructuringElement.return_value = MagicMock()
         mock_cv2.dilate.return_value = test_img
         mock_cv2.findContours.return_value = ([], None)
         mock_cv2.Canny.return_value = test_img
         mock_cv2.contourArea.return_value = 100
         mock_cv2.boundingRect.return_value = (0, 0, 10, 10)
+        mock_cv2.filter2D.return_value = np.zeros((100, 100), dtype=np.float32)
 
-        result = opencv_layout._analyze_layout(test_img)
+        result = opencv_layout._analyze_layout(test_img, cv2_module=mock_cv2, np_module=np)
 
         assert isinstance(result, dict)
         assert "text_regions" in result

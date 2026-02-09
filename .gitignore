@@ -81,6 +81,7 @@ test.py
 
 # Test data and results
 data-source-formats/
+extraction_results/
 test_*.py
 test_*.txt
 test_*.csv
