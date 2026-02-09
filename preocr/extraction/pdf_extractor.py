@@ -1276,7 +1276,7 @@ def _group_by_lines(
     if not items:
         return []
 
-    lines = []
+    lines: List[Dict[str, Any]] = []
 
     # Check if text is rotated (vertical)
     # If most items have rotation != 0, or if items have same x0 but different y, it's vertical
@@ -1618,7 +1618,10 @@ def _horizontal_overlap(bbox1: Any, bbox2: Any) -> float:
     x_overlap = max(0, min(x1_1, x1_2) - max(x0_1, x0_2))
     
     # Return overlap ratio (intersection / min width)
-    return x_overlap / min(width1, width2)
+    min_width = min(width1, width2)
+    if min_width == 0:
+        return 0.0
+    return float(x_overlap / min_width)
 
 
 def _bbox_overlaps(bbox1: Any, bbox2: Any) -> bool:
@@ -1668,8 +1671,8 @@ def _should_stitch_tables(table1: Table, table2: Table, line_height: float = 20.
         return False
     
     # Condition 4: Vertical gap < LINE_HEIGHT * 2
-    y1_table1 = table1.bbox.y1 if hasattr(table1.bbox, 'y1') else table1.bbox.get('y1', 0)
-    y0_table2 = table2.bbox.y0 if hasattr(table2.bbox, 'y0') else table2.bbox.get('y0', 0)
+    y1_table1 = table1.bbox.y1 if hasattr(table1.bbox, 'y1') else table1.bbox.get('y1', 0)  # type: ignore[attr-defined]
+    y0_table2 = table2.bbox.y0 if hasattr(table2.bbox, 'y0') else table2.bbox.get('y0', 0)  # type: ignore[attr-defined]
     vertical_gap = abs(y0_table2 - y1_table1)
     
     if vertical_gap >= line_height * 2:
@@ -1692,7 +1695,7 @@ def _stitch_tables(tables: List[Table], line_height: float = 20.0) -> List[Table
         return tables
     
     # Sort tables by page, then by y position
-    sorted_tables = sorted(tables, key=lambda t: (t.page_number, t.bbox.y0 if hasattr(t.bbox, 'y0') else t.bbox.get('y0', 0)))
+    sorted_tables = sorted(tables, key=lambda t: (t.page_number, t.bbox.y0 if hasattr(t.bbox, 'y0') else t.bbox.get('y0', 0)))  # type: ignore[attr-defined]
     
     stitched = []
     current = sorted_tables[0]
@@ -1704,13 +1707,13 @@ def _stitch_tables(tables: List[Table], line_height: float = 20.0) -> List[Table
             current.cells.extend(next_table.cells)
             
             # Extend bbox to include next table
-            current_y1 = current.bbox.y1 if hasattr(current.bbox, 'y1') else current.bbox.get('y1', 0)
-            next_y1 = next_table.bbox.y1 if hasattr(next_table.bbox, 'y1') else next_table.bbox.get('y1', 0)
+            current_y1 = current.bbox.y1 if hasattr(current.bbox, 'y1') else current.bbox.get('y1', 0)  # type: ignore[attr-defined]
+            next_y1 = next_table.bbox.y1 if hasattr(next_table.bbox, 'y1') else next_table.bbox.get('y1', 0)  # type: ignore[attr-defined]
             
             if hasattr(current.bbox, 'y1'):
                 current.bbox.y1 = max(current_y1, next_y1)
             else:
-                current.bbox['y1'] = max(current_y1, next_y1)
+                current.bbox['y1'] = max(current_y1, next_y1)  # type: ignore[index]
             
             # Update metadata
             current.metadata["stitched_from"] = current.metadata.get("stitched_from", []) + [next_table.element_id]
@@ -1738,13 +1741,13 @@ def _reindex_table_rows(table: Table, line_height: float = 20.0) -> Table:
         return table
     
     # Group cells by approximate Y position (same row)
-    cells_by_y = {}
+    cells_by_y: Dict[float, List[TableCell]] = {}
     
     for cell in table.cells:
         if not cell.bbox:
             continue
         
-        y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)
+        y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)  # type: ignore[attr-defined]
         
         # Find existing row group with similar Y
         matched_row_y = None
@@ -1791,18 +1794,18 @@ def _aligns_with_column(elem: Element, table: Table, col_index: int, threshold: 
     if not elem.bbox or not table.bbox:
         return False
     
-    elem_x0 = elem.bbox.x0 if hasattr(elem.bbox, 'x0') else elem.bbox.get('x0', 0)
-    table_x0 = table.bbox.x0 if hasattr(table.bbox, 'x0') else table.bbox.get('x0', 0)
+    elem_x0 = elem.bbox.x0 if hasattr(elem.bbox, 'x0') else elem.bbox.get('x0', 0)  # type: ignore[attr-defined]
+    table_x0 = table.bbox.x0 if hasattr(table.bbox, 'x0') else table.bbox.get('x0', 0)  # type: ignore[attr-defined]
     
     # Calculate column width
-    table_width = (table.bbox.x1 if hasattr(table.bbox, 'x1') else table.bbox.get('x1', 0)) - table_x0
+    table_width = (table.bbox.x1 if hasattr(table.bbox, 'x1') else table.bbox.get('x1', 0)) - table_x0  # type: ignore[attr-defined]
     col_width = table_width / table.columns if table.columns > 0 else table_width
     
     # Expected column X position
     expected_col_x = table_x0 + (col_index * col_width)
     
     # Check if element aligns with column
-    return abs(elem_x0 - expected_col_x) < threshold
+    return bool(abs(elem_x0 - expected_col_x) < threshold)
 
 
 def _split_line_item_text(text: str) -> List[str]:
@@ -1838,13 +1841,13 @@ def _rebuild_table_rows(table: Table, line_height: float = 20.0) -> Table:
         return table
     
     # Group cells by approximate Y position (same row)
-    rows_by_y = {}
+    rows_by_y: Dict[int, List[TableCell]] = {}
     
     for cell in table.cells:
         if not cell.bbox:
             continue
         
-        y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)
+        y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)  # type: ignore[attr-defined]
         row_key = round(y0 / line_height)
         
         if row_key not in rows_by_y:
@@ -1891,8 +1894,8 @@ def _promote_narrative_to_table(elements: List[Element], table: Table, line_heig
     if not table.bbox:
         return table
     
-    table_y0 = table.bbox.y0 if hasattr(table.bbox, 'y0') else table.bbox.get('y0', 0)
-    table_y1 = table.bbox.y1 if hasattr(table.bbox, 'y1') else table.bbox.get('y1', 0)
+    table_y0 = table.bbox.y0 if hasattr(table.bbox, 'y0') else table.bbox.get('y0', 0)  # type: ignore[attr-defined]
+    table_y1 = table.bbox.y1 if hasattr(table.bbox, 'y1') else table.bbox.get('y1', 0)  # type: ignore[attr-defined]
     
     # Track seen rows by Y position (dedupe)
     seen_rows = set()
@@ -1906,8 +1909,8 @@ def _promote_narrative_to_table(elements: List[Element], table: Table, line_heig
         if not elem.bbox:
             continue
         
-        elem_y0 = elem.bbox.y0 if hasattr(elem.bbox, 'y0') else elem.bbox.get('y0', 0)
-        elem_y1 = elem.bbox.y1 if hasattr(elem.bbox, 'y1') else elem.bbox.get('y1', 0)
+        elem_y0 = elem.bbox.y0 if hasattr(elem.bbox, 'y0') else elem.bbox.get('y0', 0)  # type: ignore[attr-defined]
+        elem_y1 = elem.bbox.y1 if hasattr(elem.bbox, 'y1') else elem.bbox.get('y1', 0)  # type: ignore[attr-defined]
         elem_center_y = (elem_y0 + elem_y1) / 2
         
         # Check if element Y is within table Y range
@@ -1932,12 +1935,12 @@ def _promote_narrative_to_table(elements: List[Element], table: Table, line_heig
             continue
         
         # Split text into columns
-        parts = _split_line_item_text(elem.text)
+        text_parts = _split_line_item_text(elem.text)
         
-        if len(parts) >= 2:  # At least description and price
+        if len(text_parts) >= 2:  # At least description and price
             promoted_rows.append({
                 'y0': elem_y0,
-                'parts': parts,
+                'parts': text_parts,
                 'bbox': elem.bbox,
             })
             seen_rows.add(row_key)
@@ -1945,26 +1948,30 @@ def _promote_narrative_to_table(elements: List[Element], table: Table, line_heig
     # Add promoted rows as cells
     if promoted_rows:
         # Sort by Y position
-        promoted_rows.sort(key=lambda r: r['y0'])
+        promoted_rows.sort(key=lambda r: float(r.get('y0', 0.0)))  # type: ignore[arg-type]
         
         # Add to existing cells (will be rebuilt by _rebuild_table_rows)
         for row_data in promoted_rows:
-            table_x0 = table.bbox.x0 if hasattr(table.bbox, 'x0') else table.bbox.get('x0', 0)
-            table_width = (table.bbox.x1 if hasattr(table.bbox, 'x1') else table.bbox.get('x1', 0)) - table_x0
+            table_x0 = table.bbox.x0 if hasattr(table.bbox, 'x0') else table.bbox.get('x0', 0)  # type: ignore[attr-defined]
+            table_width = (table.bbox.x1 if hasattr(table.bbox, 'x1') else table.bbox.get('x1', 0)) - table_x0  # type: ignore[attr-defined]
             col_width = table_width / table.columns if table.columns > 0 else table_width
             
-            for col_idx, part_text in enumerate(row_data['parts']):
+            row_parts: List[str] = row_data.get('parts', [])  # type: ignore[assignment]
+            row_y0_val: Any = row_data.get('y0', 0.0)
+            row_y0: float = float(row_y0_val) if isinstance(row_y0_val, (int, float)) else 0.0
+            
+            for col_idx, part_text in enumerate(row_parts):
                 if col_idx >= table.columns:
                     break
                 
                 cell_bbox = create_bbox(
                     table_x0 + (col_idx * col_width),
-                    row_data['y0'],
+                    row_y0,
                     table_x0 + ((col_idx + 1) * col_width),
-                    row_data['y0'] + 20,  # Approximate height
+                    row_y0 + 20.0,  # Approximate height
                     table.page_number,
-                    table.bbox.layout_width if hasattr(table.bbox, 'layout_width') else table.bbox.get('layout_width'),
-                    table.bbox.layout_height if hasattr(table.bbox, 'layout_height') else table.bbox.get('layout_height'),
+                    table.bbox.layout_width if hasattr(table.bbox, 'layout_width') else table.bbox.get('layout_width'),  # type: ignore[attr-defined]
+                    table.bbox.layout_height if hasattr(table.bbox, 'layout_height') else table.bbox.get('layout_height'),  # type: ignore[attr-defined]
                 )
                 
                 cell = TableCell(
@@ -2039,7 +2046,7 @@ def _extract_money_value(elements: List[Element], tables: List[Table], label: st
     table_y1 = 0.0
     for table in tables:
         if not table.metadata.get("is_decorative", False) and table.bbox:
-            table_bottom = table.bbox.y1 if hasattr(table.bbox, 'y1') else table.bbox.get('y1', 0)
+            table_bottom = table.bbox.y1 if hasattr(table.bbox, 'y1') else table.bbox.get('y1', 0)  # type: ignore[attr-defined]
             table_y1 = max(table_y1, table_bottom)
     
     # Check elements (including those below table)
@@ -2089,7 +2096,7 @@ def _extract_money_value(elements: List[Element], tables: List[Table], label: st
             continue
         
         # Group cells by row
-        cells_by_row = {}
+        cells_by_row: Dict[int, List[TableCell]] = {}
         for cell in table.cells:
             row = cell.row
             if row not in cells_by_row:
@@ -2276,7 +2283,7 @@ def _build_invoice_data(elements: List[Element], tables: List[Table]) -> Dict[st
     # Detect currency
     currency = _detect_currency(elements)
     
-    invoice_data = {
+    invoice_data: Dict[str, Any] = {
         "invoice_number": _extract_invoice_number(elements),
         "bill_to": _extract_customer_address(elements),
         "line_items": [],
@@ -2302,7 +2309,7 @@ def _build_invoice_data(elements: List[Element], tables: List[Table]) -> Dict[st
             continue
         
         # Group cells by row
-        cells_by_row = {}
+        cells_by_row: Dict[int, List[TableCell]] = {}
         for cell in table.cells:
             row = cell.row
             if row not in cells_by_row:
@@ -2341,7 +2348,7 @@ def _validate_invoice(invoice_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns validation result with status and errors.
     Uses the "total" column from line items for calculation.
     """
-    validation = {
+    validation: Dict[str, Any] = {
         "status": "VALID",
         "errors": [],
         "warnings": [],
@@ -2375,18 +2382,22 @@ def _validate_invoice(invoice_data: Dict[str, Any]) -> Dict[str, Any]:
     if subtotal is not None:
         if abs(sum_items - subtotal) > 0.01:
             validation["status"] = "INVALID_SUBTOTAL"
-            validation["errors"].append(
-                f"Subtotal mismatch: calculated {sum_items:.2f}, found {subtotal:.2f}"
-            )
+            errors_list = validation.get("errors", [])
+            if isinstance(errors_list, list):
+                errors_list.append(
+                    f"Subtotal mismatch: calculated {sum_items:.2f}, found {subtotal:.2f}"
+                )
     
     # Validate total
     if subtotal is not None and tax is not None and total is not None:
         expected_total = subtotal + tax
         if abs(expected_total - total) > 0.01:
             validation["status"] = "INVALID_TOTAL"
-            validation["errors"].append(
-                f"Total mismatch: expected {expected_total:.2f}, found {total:.2f}"
-            )
+            errors_list = validation.get("errors", [])
+            if isinstance(errors_list, list):
+                errors_list.append(
+                    f"Total mismatch: expected {expected_total:.2f}, found {total:.2f}"
+                )
     
     return validation
 
@@ -2431,20 +2442,20 @@ def _remove_elements_inside_tables(elements: List[Element], tables: List[Table])
             if table.metadata.get("is_decorative", False):
                 continue
             
-            elem_x0 = elem.bbox.x0 if hasattr(elem.bbox, 'x0') else elem.bbox.get('x0', 0)
-            elem_y0 = elem.bbox.y0 if hasattr(elem.bbox, 'y0') else elem.bbox.get('y0', 0)
-            elem_x1 = elem.bbox.x1 if hasattr(elem.bbox, 'x1') else elem.bbox.get('x1', 0)
-            elem_y1 = elem.bbox.y1 if hasattr(elem.bbox, 'y1') else elem.bbox.get('y1', 0)
+            elem_x0 = elem.bbox.x0 if hasattr(elem.bbox, 'x0') else elem.bbox.get('x0', 0)  # type: ignore[attr-defined]
+            elem_y0 = elem.bbox.y0 if hasattr(elem.bbox, 'y0') else elem.bbox.get('y0', 0)  # type: ignore[attr-defined]
+            elem_x1 = elem.bbox.x1 if hasattr(elem.bbox, 'x1') else elem.bbox.get('x1', 0)  # type: ignore[attr-defined]
+            elem_y1 = elem.bbox.y1 if hasattr(elem.bbox, 'y1') else elem.bbox.get('y1', 0)  # type: ignore[attr-defined]
             
             # Check if element is inside any table cell
             for cell in table.cells:
                 if not cell.bbox:
                     continue
                 
-                cell_x0 = cell.bbox.x0 if hasattr(cell.bbox, 'x0') else cell.bbox.get('x0', 0)
-                cell_y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)
-                cell_x1 = cell.bbox.x1 if hasattr(cell.bbox, 'x1') else cell.bbox.get('x1', 0)
-                cell_y1 = cell.bbox.y1 if hasattr(cell.bbox, 'y1') else cell.bbox.get('y1', 0)
+                cell_x0 = cell.bbox.x0 if hasattr(cell.bbox, 'x0') else cell.bbox.get('x0', 0)  # type: ignore[attr-defined]
+                cell_y0 = cell.bbox.y0 if hasattr(cell.bbox, 'y0') else cell.bbox.get('y0', 0)  # type: ignore[attr-defined]
+                cell_x1 = cell.bbox.x1 if hasattr(cell.bbox, 'x1') else cell.bbox.get('x1', 0)  # type: ignore[attr-defined]
+                cell_y1 = cell.bbox.y1 if hasattr(cell.bbox, 'y1') else cell.bbox.get('y1', 0)  # type: ignore[attr-defined]
                 
                 # Check if element center is inside cell, or element is mostly inside cell
                 elem_center_x = (elem_x0 + elem_x1) / 2
@@ -2486,8 +2497,14 @@ def _fix_reversed_text(text: str, bbox: Any) -> str:
         return text
     
     # Check if bbox suggests rotated/vertical text
-    bbox_width = bbox.x1 - bbox.x0 if hasattr(bbox, 'x1') else 0
-    bbox_height = bbox.y1 - bbox.y0 if hasattr(bbox, 'y1') else 0
+    if hasattr(bbox, 'x1') and hasattr(bbox, 'x0'):
+        bbox_width = bbox.x1 - bbox.x0
+    else:
+        bbox_width = 0
+    if hasattr(bbox, 'y1') and hasattr(bbox, 'y0'):
+        bbox_height = bbox.y1 - bbox.y0
+    else:
+        bbox_height = 0
     
     # If height >> width, might be rotated text
     is_rotated = bbox_height > 3 * bbox_width if bbox_width > 0 else False
