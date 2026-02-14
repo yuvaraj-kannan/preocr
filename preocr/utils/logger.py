@@ -96,55 +96,57 @@ def suppress_pdf_warnings() -> Iterator[None]:
         ...     result = extract_pdf_text("file.pdf")
     """
     import sys
-    
+
     # Create a filter class for stderr that suppresses PyMuPDF color warnings
     class StderrFilter:
         def __init__(self, original_stderr):
             self.original_stderr = original_stderr
-        
+
         def write(self, text: str) -> int:
             # Filter out PyMuPDF color warnings
             if "Cannot set gray" in text or "invalid float value" in text or "/'Pat" in text:
                 return len(text)  # Pretend we wrote it (suppress)
             return int(self.original_stderr.write(text))
-        
+
         def flush(self):
             self.original_stderr.flush()
-        
+
         def __getattr__(self, name):
             return getattr(self.original_stderr, name)
-    
+
     # Suppress Python warnings
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", message=".*gray.*non-stroke.*color.*")
         warnings.filterwarnings("ignore", message=".*invalid float value.*")
         warnings.filterwarnings("ignore", message=".*Pat.*")
-        
+
         # Redirect stderr to filter
         original_stderr = sys.stderr
         filtered_stderr = StderrFilter(original_stderr)
         sys.stderr = filtered_stderr
-        
+
         # Also suppress warnings from pdfplumber/PyMuPDF modules via logging
         try:
             import pdfplumber  # noqa: F401
+
             pdfplumber_logger = logging.getLogger("pdfplumber")
             original_pdfplumber_level = pdfplumber_logger.level
             pdfplumber_logger.setLevel(logging.ERROR)
         except ImportError:
             pdfplumber_logger = None
             original_pdfplumber_level = None
-        
+
         try:
             import fitz  # PyMuPDF  # noqa: F401
+
             pymupdf_logger = logging.getLogger("fitz")
             pymupdf_original_level = pymupdf_logger.level
             pymupdf_logger.setLevel(logging.ERROR)
         except ImportError:
             pymupdf_logger = None
             pymupdf_original_level = None
-        
+
         try:
             yield
         finally:

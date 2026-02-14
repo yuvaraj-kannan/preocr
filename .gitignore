@@ -82,7 +82,9 @@ test.py
 # Test data and results
 data-source-formats/
 extraction_results/
-test_*.py
+# Ad-hoc test scripts (root and scripts/); tests/test_*.py are part of the suite
+/test_*.py
+scripts/test_*.py
 test_*.txt
 test_*.csv
 test_*.json

@@ -42,11 +42,11 @@ def analyze_pdf_pages(
         2. Adjusted based on consistency:
            - If all pages are consistent (all need OCR or all don't), confidence +0.1
            - If pages are mixed (some need OCR, some don't), confidence -0.1
-        
+
         This means:
         - Uniform documents (all scanned or all digital) get higher confidence
         - Mixed documents get lower confidence, reflecting the uncertainty
-        
+
         Per-page confidence:
         - Pages with text: 0.95 (high confidence)
         - Pages without text: 0.80 if completely empty, 0.60 if sparse text

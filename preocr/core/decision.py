@@ -22,44 +22,44 @@ def calculate_ocr_score(
 ) -> float:
     """
     Calculate OCR_SCORE using pixel-aware scoring model.
-    
-    OCR_SCORE = 0.35 * image_ratio + 0.25 * (1 - alphabet_ratio) + 
+
+    OCR_SCORE = 0.35 * image_ratio + 0.25 * (1 - alphabet_ratio) +
                 0.2 * low_text_density + 0.2 * font_suspicion
-    
+
     Args:
         text_length: Length of extracted text
         image_coverage: Image coverage percentage (0-100)
         text_coverage: Text coverage percentage (0-100)
         config: Optional Config object
-    
+
     Returns:
         OCR_SCORE (0.0-1.0) where higher score indicates more likely to need OCR
     """
     if config is None:
         config = _DEFAULT_CONFIG
-    
+
     # Calculate image_ratio from image_coverage (convert percentage to ratio)
     image_ratio = image_coverage / 100.0 if image_coverage > 0 else 0.0
-    
+
     # Approximate alphabet_ratio (normalized text length factor)
     max_expected_text = 10000  # Reasonable max for a page
     alphabet_ratio = min(text_length / max_expected_text, 1.0) if text_length > 0 else 0.0
-    
+
     # Calculate low_text_density (inverse of text_coverage, normalized)
     text_density = text_coverage / 100.0 if text_coverage > 0 else 0.0
     low_text_density = 1.0 - min(text_density, 1.0)
-    
+
     # Font suspicion: higher when text_length is very low
     font_suspicion = 1.0 - min(text_length / 50.0, 1.0) if text_length < 50 else 0.0
-    
+
     # Calculate OCR score
     ocr_score = (
-        0.35 * image_ratio +
-        0.25 * (1.0 - alphabet_ratio) +
-        0.20 * low_text_density +
-        0.20 * font_suspicion
+        0.35 * image_ratio
+        + 0.25 * (1.0 - alphabet_ratio)
+        + 0.20 * low_text_density
+        + 0.20 * font_suspicion
     )
-    
+
     return round(ocr_score, 3)
 
 
@@ -71,24 +71,24 @@ def calculate_confidence_from_signals(
 ) -> float:
     """
     Calculate confidence score from signals using unified approach.
-    
+
     Priority:
     1. Use OCR_SCORE if available (most accurate)
     2. Use layout-based calculation
     3. Fallback to text-length based
-    
+
     Args:
         signals: Dictionary of signals from signals.collect_signals()
         needs_ocr: Boolean indicating if OCR is needed
         ocr_score: Optional OCR_SCORE (0.0-1.0) if already calculated
         config: Optional Config object
-    
+
     Returns:
         Confidence score (0.0-1.0)
     """
     if config is None:
         config = _DEFAULT_CONFIG
-    
+
     # Priority 1: Use OCR_SCORE if available (most accurate)
     if ocr_score is not None and config.use_ocr_score_confidence:
         # Calibrate OCR_SCORE to confidence range (0.50-0.95)
@@ -99,13 +99,13 @@ def calculate_confidence_from_signals(
             # Lower OCR_SCORE = higher confidence for "no OCR"
             confidence = 0.50 + ((1.0 - ocr_score) * 0.45)  # Range: 0.50-0.95
         return round(confidence, 2)
-    
+
     # Priority 2: Layout-based (if layout data available)
     layout_type = signals.get("layout_type")
     if layout_type and layout_type != "unknown":
         text_coverage = float(signals.get("text_coverage", 0.0))
         image_coverage = float(signals.get("image_coverage", 0.0))
-        
+
         if needs_ocr:
             # More images = higher confidence
             image_factor = min(image_coverage / 100.0, 1.0)
@@ -115,7 +115,7 @@ def calculate_confidence_from_signals(
             text_factor = min(text_coverage / 100.0, 1.0)
             confidence = 0.70 + (text_factor * 0.25)  # Range: 0.70-0.95
         return round(confidence, 2)
-    
+
     # Priority 3: Text-length based fallback
     text_length = signals.get("text_length", 0)
     if needs_ocr:
@@ -129,7 +129,7 @@ def calculate_confidence_from_signals(
         # More text = higher confidence (digital)
         text_factor = min(text_length / 1000.0, 1.0)
         confidence = 0.75 + (text_factor * 0.20)  # Range: 0.75-0.95
-    
+
     return round(confidence, 2)
 
 
@@ -205,21 +205,25 @@ def decide(
         is_mixed_content = signals.get("is_mixed_content", False)
         text_coverage = signals.get("text_coverage", 0.0)
         image_coverage = signals.get("image_coverage", 0.0)
-        
+
         # Calculate image_ratio from image_coverage (convert percentage to ratio)
         # Also check OpenCV results if available (more accurate for scanned PDFs)
         opencv_layout = signals.get("opencv_layout", {})
         image_coverage_opencv = opencv_layout.get("image_coverage", 0.0) if opencv_layout else 0.0
-        
+
         # Use OpenCV image_coverage if available (more accurate), otherwise use layout image_coverage
-        effective_image_coverage = image_coverage_opencv if image_coverage_opencv > 0 else image_coverage
+        effective_image_coverage = (
+            image_coverage_opencv if image_coverage_opencv > 0 else image_coverage
+        )
         image_ratio = effective_image_coverage / 100.0 if effective_image_coverage > 0 else 0.0
-        
+
         # Calculate OCR_SCORE for unified confidence calculation
         ocr_score = None
         if layout_type and layout_type != "unknown":
-            ocr_score = calculate_ocr_score(text_length, effective_image_coverage, text_coverage, config)
-        
+            ocr_score = calculate_ocr_score(
+                text_length, effective_image_coverage, text_coverage, config
+            )
+
         # 🔥 Hybrid Rule: Sweet spot for OCR detection
         # If image_ratio > 0.75 AND extracted_text_length < 30 → OCR
         # This catches scanned PDFs that are image-heavy with minimal extractable text
@@ -237,7 +241,7 @@ def decide(
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
-        
+
         # Alternative: If text_length is very low (< 30) and we have layout data suggesting images
         # This handles cases where scanned PDFs aren't detected as images but have no text
         if text_length < 30 and layout_type and layout_type != "unknown":
@@ -276,7 +280,7 @@ def decide(
                         CATEGORY_UNSTRUCTURED,
                         ReasonCode.PDF_MIXED,
                     )
-                
+
                 # If text coverage is significant, might not need full OCR
                 if text_length >= config.min_text_length and text_coverage > 10:
                     confidence = calculate_confidence_from_signals(
@@ -359,7 +363,7 @@ def decide(
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
-        
+
         # Fallback to text-length based decision (when layout analysis not available)
         if text_length >= config.min_text_length:
             # Use unified confidence calculation (fallback mode)
@@ -472,21 +476,21 @@ def refine_with_opencv(
     image_coverage_opencv = opencv_result.get("image_coverage", 0.0)
     has_text_regions = opencv_result.get("has_text_regions", False)
     layout_type = opencv_result.get("layout_type", "unknown")
-    
+
     # Calculate OCR_SCORE from OpenCV results for unified confidence
     ocr_score_opencv = calculate_ocr_score(
         text_length, image_coverage_opencv, text_coverage_opencv, config
     )
-    
+
     # Update signals with OpenCV layout data for confidence calculation
     signals_with_opencv = signals.copy()
     signals_with_opencv["layout_type"] = layout_type
     signals_with_opencv["text_coverage"] = text_coverage_opencv
     signals_with_opencv["image_coverage"] = image_coverage_opencv
-    
+
     # Calculate image_ratio from image_coverage (convert percentage to ratio)
     image_ratio = image_coverage_opencv / 100.0 if image_coverage_opencv > 0 else 0.0
-    
+
     # 🔥 Hybrid Rule: Sweet spot for OCR detection (applied in OpenCV refinement too)
     # If image_ratio > 0.75 AND extracted_text_length < 30 → OCR
     if image_ratio > 0.75 and text_length < 30:
@@ -526,7 +530,7 @@ def refine_with_opencv(
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_MIXED,
             )
-        
+
         if text_length >= config.min_text_length and text_coverage_opencv > 15:
             # Digital text document - use unified confidence calculation
             confidence = calculate_confidence_from_signals(
@@ -607,7 +611,10 @@ def refine_with_opencv(
     if (initial_needs_ocr and not has_text_regions) or (not initial_needs_ocr and has_text_regions):
         # Calculate OCR_SCORE-based confidence
         ocr_confidence = calculate_confidence_from_signals(
-            signals_with_opencv, needs_ocr=initial_needs_ocr, ocr_score=ocr_score_opencv, config=config
+            signals_with_opencv,
+            needs_ocr=initial_needs_ocr,
+            ocr_score=ocr_score_opencv,
+            config=config,
         )
         # Weighted combination: 30% initial, 70% OCR_SCORE-based (OpenCV is more accurate)
         confidence = (initial_confidence * 0.3) + (ocr_confidence * 0.7)

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-02-09
+
+### Fixed
+- **OpenCV Bounding Box Access**: Replaced `_cv2.boundingRect` with `cv2.boundingRect` for consistency in OpenCV layout analysis
+- **Test Coverage**: Enhanced test mocks with additional OpenCV function attributes for improved test accuracy
+- **Gitignore**: Updated `.gitignore` to exclude `extraction_results/` directory
+
+## [1.2.0] - 2026-02-09
+
+### Added
+- **Enhanced PDF Extraction**: Improved PDF extraction logic with new features including reversed text fixing, table stitching, and narrative text deduplication
+- **Invoice Extraction**: Enhanced structured data extraction for invoices with improved validation and metadata handling
+- **Detailed Logging**: Added comprehensive logging for table processing and document type detection
+
+### Changed
+- **README Enhancement**: Updated README.md to clarify library capabilities and improve structure with new sections on key benefits and comparison table
+- **Bounding Box Access**: Streamlined bounding box attribute access in PDF extraction logic using `getattr` for better compatibility with various object structures
+- **Type Safety**: Improved type hinting throughout PDF extraction logic for better clarity and type safety
+- **Code Optimization**: Removed redundant `item_top` calculation in PDF extraction logic for better performance
+
+### Fixed
+- Fixed division by zero errors in overlap calculations with proper edge case handling
+- Improved bounding box attribute handling to ensure compatibility with various object structures
+
+## [1.1.0] - 2026-02-08
+
+### Fixed
+- **Type Conversion**: Fixed type conversion issues in `calculate_confidence_from_signals()` by explicitly converting `text_coverage` and `image_coverage` to float for accurate calculations
+- **Logger Output**: Fixed `suppress_pdf_warnings()` to return an integer from the original stderr write method, ensuring consistent return types
+- **Output Formatting**: Improved output formatting in `layout_aware_usage.py` example by removing f-string formatting for consistency
+- **Import Warnings**: Updated logger imports to include `# noqa: F401` comments, suppressing unused import warnings
+
 ## [1.1.5] - 2026-02-06
 
 ### Added
@@ -295,7 +327,11 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.1
+[1.2.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.0
+[1.1.5]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.1.5
+[1.1.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.1.0
 [1.0.5]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.5
 [1.0.4]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.4
 [1.0.3]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.0.3

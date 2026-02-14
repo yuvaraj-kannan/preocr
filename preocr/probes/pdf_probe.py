@@ -88,7 +88,7 @@ def extract_pdf_text(file_path: str, page_level: bool = False) -> Dict[str, Any]
 
     # Both extractors failed - try to at least get page count
     page_count = _get_page_count_only(path)
-    
+
     # Build result with page count even if text extraction failed
     result = {
         "text_length": 0,
@@ -96,7 +96,7 @@ def extract_pdf_text(file_path: str, page_level: bool = False) -> Dict[str, Any]
         "page_count": page_count,
         "method": None,
     }
-    
+
     if page_level and page_count > 0:
         # Create page entries even if text extraction failed
         pages_data = []
@@ -112,7 +112,7 @@ def extract_pdf_text(file_path: str, page_level: bool = False) -> Dict[str, Any]
         result["pages"] = pages_data
     elif page_level:
         result["pages"] = []
-    
+
     return result
 
 

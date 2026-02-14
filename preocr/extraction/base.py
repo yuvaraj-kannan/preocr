@@ -75,7 +75,7 @@ def calculate_confidence(
         text_quality: Quality of text (0.0-1.0), based on font size and clarity
         extraction_method: Method used ("pdfplumber" = 0.9, "pymupdf" = 0.8)
         element_type_certainty: How certain we are about classification (0.0-1.0)
-        bbox_accuracy: How well-defined the bbox is (0.0-1.0) 
+        bbox_accuracy: How well-defined the bbox is (0.0-1.0)
 
     Returns:
         Confidence score between 0.0 and 1.0

@@ -9,7 +9,6 @@ on:
     paths-ignore:
       - '**.md'
       - '.github/workflows/RELEASE_WORKFLOW.md'
-      - '.github/PYPI_SETUP.md'
       - 'CHANGELOG.md'
       - 'LICENSE'
 
