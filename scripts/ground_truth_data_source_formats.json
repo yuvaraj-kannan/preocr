@@ -1,0 +1,52 @@
+[
+  {
+    "file": "datasets/sample-unstructured-paper.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF with extractable text"
+  },
+  {
+    "file": "datasets/PrinceCatalogue.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF with extractable text"
+  },
+  {
+    "file": "datasets/embedded-images-tables.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF with images and tables"
+  },
+  {
+    "file": "datasets/white-paper.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF"
+  },
+  {
+    "file": "datasets/product-manual.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF"
+  },
+  {
+    "file": "datasets/invoicesample.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF invoice"
+  },
+  {
+    "file": "datasets/index.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF"
+  },
+  {
+    "file": "datasets/Multiturn-ContosoBenefits.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF"
+  },
+  {
+    "file": "datasets/Introducing-surface-laptop-4-and-new-access.pdf",
+    "needs_ocr": false,
+    "notes": "Digital PDF"
+  },
+  {
+    "file": "datasets/ORTHO case 1.pdf",
+    "needs_ocr": true,
+    "notes": "Scanned PDF, needs OCR"
+  }
+]

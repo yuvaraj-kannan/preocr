@@ -1,0 +1,146 @@
+{
+  "n_files": 9,
+  "directory": "data-source-formats",
+  "domain_mode": "generic",
+  "recursive": true,
+  "summary": {
+    "agreement_count": 7,
+    "agreement_rate": 0.7778,
+    "baseline_needs_ocr_count": 2,
+    "planner_needs_ocr_count": 0,
+    "baseline_avg_time_s": 1.107,
+    "planner_avg_time_s": 1.36,
+    "total_baseline_time_s": 9.96,
+    "total_planner_time_s": 12.24
+  },
+  "baseline_decisions": [
+    {
+      "file": "Introducing-surface-laptop-4-and-new-access.pdf",
+      "needs_ocr": true,
+      "time_s": 1.419,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "Multiturn-ContosoBenefits.pdf",
+      "needs_ocr": false,
+      "time_s": 1.116,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "PrinceCatalogue.pdf",
+      "needs_ocr": false,
+      "time_s": 0.217,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "embedded-images-tables.pdf",
+      "needs_ocr": false,
+      "time_s": 0.062,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "index.pdf",
+      "needs_ocr": false,
+      "time_s": 0.1,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "invoicesample.pdf",
+      "needs_ocr": false,
+      "time_s": 0.455,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "product-manual.pdf",
+      "needs_ocr": true,
+      "time_s": 2.727,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "sample-unstructured-paper.pdf",
+      "needs_ocr": false,
+      "time_s": 1.82,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "white-paper.pdf",
+      "needs_ocr": false,
+      "time_s": 2.048,
+      "page_level": true,
+      "layout_aware": true
+    }
+  ],
+  "planner_decisions": [
+    {
+      "file": "Introducing-surface-laptop-4-and-new-access.pdf",
+      "needs_ocr": false,
+      "time_s": 2.175,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "Multiturn-ContosoBenefits.pdf",
+      "needs_ocr": false,
+      "time_s": 1.121,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "PrinceCatalogue.pdf",
+      "needs_ocr": false,
+      "time_s": 0.305,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "embedded-images-tables.pdf",
+      "needs_ocr": false,
+      "time_s": 0.139,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "index.pdf",
+      "needs_ocr": false,
+      "time_s": 0.109,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "invoicesample.pdf",
+      "needs_ocr": false,
+      "time_s": 0.495,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "product-manual.pdf",
+      "needs_ocr": false,
+      "time_s": 4.169,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "sample-unstructured-paper.pdf",
+      "needs_ocr": false,
+      "time_s": 1.769,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "white-paper.pdf",
+      "needs_ocr": false,
+      "time_s": 1.955,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    }
+  ]
+}

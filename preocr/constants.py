@@ -1,6 +1,7 @@
 """Constants and configuration for preocr."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 # Minimum text length to consider a file as having meaningful text
 MIN_TEXT_LENGTH = 50
@@ -53,6 +54,18 @@ class Config:
                                   This aligns confidence scores with the scoring model for more
                                   meaningful confidence values. Default: True.
 
+        skip_opencv_if_file_size_mb: Skip OpenCV refinement if file_size_mb >= this. None = disabled.
+        skip_opencv_if_page_count: Skip OpenCV if page_count >= this. None = disabled.
+        skip_opencv_text_coverage_min: With page_count: require text_coverage >= this (0-100). None = no check.
+        skip_opencv_confidence_min: Only skip if initial confidence >= this. None = no check.
+        skip_opencv_max_image_coverage: Never skip when image_coverage > this. None = no guard.
+
+        digital_bias_text_coverage_min: Force needs_ocr=False when text_coverage >= this. None = disabled.
+        digital_bias_image_coverage_max: With above: require image_coverage <= this. None = disabled.
+        table_bias_text_density_min: For mixed layout: treat as digital when text_density >= this. None = disabled.
+        table_bias_text_coverage_min: With above: require text_coverage >= this. None = disabled.
+        ocr_score_image_weight: Weight for image_ratio in OCR score (default 0.35). None = use 0.35.
+
     Example:
         >>> # Use default thresholds
         >>> config = Config()
@@ -72,6 +85,16 @@ class Config:
     medium_confidence: float = MEDIUM_CONFIDENCE
     low_confidence: float = LOW_CONFIDENCE
     use_ocr_score_confidence: bool = True
+    skip_opencv_if_file_size_mb: Optional[float] = None
+    skip_opencv_if_page_count: Optional[int] = None
+    skip_opencv_text_coverage_min: Optional[float] = None
+    skip_opencv_confidence_min: Optional[float] = None
+    skip_opencv_max_image_coverage: Optional[float] = None
+    digital_bias_text_coverage_min: Optional[float] = 65.0
+    digital_bias_image_coverage_max: Optional[float] = 50.0
+    table_bias_text_density_min: Optional[float] = 1.5
+    table_bias_text_coverage_min: Optional[float] = 40.0
+    ocr_score_image_weight: Optional[float] = None
 
     def __post_init__(self) -> None:
         """Validate threshold values."""

@@ -40,21 +40,24 @@ def calculate_ocr_score(
 
     # Calculate image_ratio from image_coverage (convert percentage to ratio)
     image_ratio = image_coverage / 100.0 if image_coverage > 0 else 0.0
+    image_weight = (
+        config.ocr_score_image_weight if config.ocr_score_image_weight is not None else 0.35
+    )
 
     # Approximate alphabet_ratio (normalized text length factor)
     max_expected_text = 10000  # Reasonable max for a page
     alphabet_ratio = min(text_length / max_expected_text, 1.0) if text_length > 0 else 0.0
 
     # Calculate low_text_density (inverse of text_coverage, normalized)
-    text_density = text_coverage / 100.0 if text_coverage > 0 else 0.0
-    low_text_density = 1.0 - min(text_density, 1.0)
+    text_density_val = text_coverage / 100.0 if text_coverage > 0 else 0.0
+    low_text_density = 1.0 - min(text_density_val, 1.0)
 
     # Font suspicion: higher when text_length is very low
     font_suspicion = 1.0 - min(text_length / 50.0, 1.0) if text_length < 50 else 0.0
 
-    # Calculate OCR score
+    # Calculate OCR score (image_weight configurable for generic/financial PDFs)
     ocr_score = (
-        0.35 * image_ratio
+        image_weight * image_ratio
         + 0.25 * (1.0 - alphabet_ratio)
         + 0.20 * low_text_density
         + 0.20 * font_suspicion
@@ -210,10 +213,14 @@ def decide(
         # Also check OpenCV results if available (more accurate for scanned PDFs)
         opencv_layout = signals.get("opencv_layout", {})
         image_coverage_opencv = opencv_layout.get("image_coverage", 0.0) if opencv_layout else 0.0
+        text_coverage_opencv = opencv_layout.get("text_coverage", 0.0) if opencv_layout else 0.0
 
-        # Use OpenCV image_coverage if available (more accurate), otherwise use layout image_coverage
+        # Use OpenCV coverage if available (more accurate), otherwise use layout analyzer
         effective_image_coverage = (
             image_coverage_opencv if image_coverage_opencv > 0 else image_coverage
+        )
+        effective_text_coverage = (
+            text_coverage_opencv if text_coverage_opencv > 0 else text_coverage
         )
         image_ratio = effective_image_coverage / 100.0 if effective_image_coverage > 0 else 0.0
 
@@ -222,6 +229,28 @@ def decide(
         if layout_type and layout_type != "unknown":
             ocr_score = calculate_ocr_score(
                 text_length, effective_image_coverage, text_coverage, config
+            )
+
+        # Digital bias: high text + moderate image = digital (protects product/manual PDFs)
+        tc_min = config.digital_bias_text_coverage_min
+        ic_max = config.digital_bias_image_coverage_max
+        if (
+            tc_min is not None
+            and ic_max is not None
+            and effective_text_coverage >= tc_min
+            and effective_image_coverage <= ic_max
+            and text_length >= config.min_text_length
+        ):
+            confidence = calculate_confidence_from_signals(
+                signals, needs_ocr=False, ocr_score=ocr_score, config=config
+            )
+            confidence = max(confidence, 0.85)
+            return (
+                False,
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (high text coverage {effective_text_coverage:.1f}%, digital bias)",
+                confidence,
+                CATEGORY_STRUCTURED,
+                ReasonCode.PDF_DIGITAL,
             )
 
         # 🔥 Hybrid Rule: Sweet spot for OCR detection
@@ -262,6 +291,29 @@ def decide(
         if layout_type and layout_type != "unknown":
             # Mixed content: has both text and images
             if is_mixed_content:
+                # Table bias: mixed layout with high text density = tables/digital, not scanned
+                td_min = config.table_bias_text_density_min
+                tc_min_table = config.table_bias_text_coverage_min
+                text_density = signals.get("text_density", 0.0)
+                if (
+                    td_min is not None
+                    and tc_min_table is not None
+                    and text_density >= td_min
+                    and effective_text_coverage >= tc_min_table
+                    and text_length >= config.min_text_length
+                ):
+                    confidence = calculate_confidence_from_signals(
+                        signals, needs_ocr=False, ocr_score=ocr_score, config=config
+                    )
+                    confidence = max(confidence, 0.80)
+                    return (
+                        False,
+                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (mixed layout, high text density {text_density:.1f}, table bias)",
+                        confidence,
+                        CATEGORY_STRUCTURED,
+                        ReasonCode.PDF_DIGITAL,
+                    )
+
                 # Special case: Very high image coverage (>70%) may contain text in images
                 # Even if extractable text exists, background images might need OCR
                 # This handles cases like PrinceCatalogue.pdf with decorative/background images
@@ -508,6 +560,28 @@ def refine_with_opencv(
             ReasonCode.PDF_SCANNED,
         )
 
+    # Digital bias: high text + moderate image = digital (applied in refinement too)
+    tc_min = config.digital_bias_text_coverage_min
+    ic_max = config.digital_bias_image_coverage_max
+    if (
+        tc_min is not None
+        and ic_max is not None
+        and text_coverage_opencv >= tc_min
+        and image_coverage_opencv <= ic_max
+        and text_length >= config.min_text_length
+    ):
+        confidence = calculate_confidence_from_signals(
+            signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
+        )
+        confidence = max(confidence, 0.85)
+        return (
+            False,
+            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV digital bias: {text_coverage_opencv:.1f}% text, {image_coverage_opencv:.1f}% images)",
+            confidence,
+            CATEGORY_STRUCTURED,
+            ReasonCode.PDF_DIGITAL,
+        )
+
     # Refinement logic based on OpenCV analysis
     # Use layout_type for more accurate decisions
 
@@ -580,6 +654,28 @@ def refine_with_opencv(
 
     # Case 3: Mixed content layout
     elif layout_type == "mixed":
+        # Table bias: high text density = tables/digital
+        td_min = config.table_bias_text_density_min
+        tc_min_table = config.table_bias_text_coverage_min
+        text_density = signals.get("text_density", 0.0)
+        if (
+            td_min is not None
+            and tc_min_table is not None
+            and text_density >= td_min
+            and text_coverage_opencv >= tc_min_table
+            and text_length >= config.min_text_length
+        ):
+            confidence = calculate_confidence_from_signals(
+                signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
+            )
+            confidence = max(confidence, 0.80)
+            return (
+                False,
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV mixed, table bias: text_density {text_density:.1f})",
+                confidence,
+                CATEGORY_STRUCTURED,
+                ReasonCode.PDF_DIGITAL,
+            )
         if text_coverage_opencv > 15 and text_length >= config.min_text_length:
             # Text is significant, might not need full OCR
             # Use unified confidence calculation

@@ -9,7 +9,7 @@ import json
 import time
 import statistics
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from collections import defaultdict
 
 from preocr import needs_ocr
@@ -22,6 +22,7 @@ def benchmark_with_accuracy(
     layout_aware: bool = False,
     page_level: bool = False,
     max_files: Optional[int] = None,
+    max_size_mb: Optional[float] = None,
 ) -> Dict:
     """
     Benchmark both performance and accuracy.
@@ -37,13 +38,27 @@ def benchmark_with_accuracy(
         Dictionary with benchmark and accuracy results
     """
     # Get files
-    extensions = [".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".docx", ".pptx", ".xlsx", ".txt"]
+    extensions = [
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tiff",
+        ".tif",
+        ".docx",
+        ".pptx",
+        ".xlsx",
+        ".txt",
+    ]
     files = []
     for ext in extensions:
         files.extend(directory.glob(f"*{ext}"))
         files.extend(directory.glob(f"*{ext.upper()}"))
 
     files = sorted(set(files))
+    if max_size_mb is not None:
+        max_bytes = max_size_mb * 1024 * 1024
+        files = [f for f in files if f.stat().st_size <= max_bytes]
     if max_files:
         files = files[:max_files]
 
@@ -67,9 +82,7 @@ def benchmark_with_accuracy(
         # Time the analysis
         start = time.perf_counter()
         try:
-            ocr_result = needs_ocr(
-                file_path, layout_aware=layout_aware, page_level=page_level
-            )
+            ocr_result = needs_ocr(file_path, layout_aware=layout_aware, page_level=page_level)
             elapsed = time.perf_counter() - start
 
             result.update(
@@ -96,7 +109,7 @@ def benchmark_with_accuracy(
     # Accuracy validation (if ground truth provided)
     accuracy_metrics = None
     if ground_truth_file and Path(ground_truth_file).exists():
-        print(f"\n📊 Validating accuracy...")
+        print("\n📊 Validating accuracy...")
         validator = AccuracyValidator(ground_truth_file)
         validation_results = validator.validate_directory(
             directory, layout_aware=layout_aware, page_level=page_level
@@ -111,9 +124,11 @@ def benchmark_with_accuracy(
             "max": max(valid_times),
             "mean": statistics.mean(valid_times),
             "median": statistics.median(valid_times),
-            "p95": sorted(valid_times)[int(len(valid_times) * 0.95)]
-            if len(valid_times) > 1
-            else valid_times[0],
+            "p95": (
+                sorted(valid_times)[int(len(valid_times) * 0.95)]
+                if len(valid_times) > 1
+                else valid_times[0]
+            ),
         }
     else:
         perf_stats = {}
@@ -153,7 +168,7 @@ def print_comprehensive_report(results: Dict) -> None:
     stats = perf.get("statistics", {})
 
     if stats:
-        print(f"\n⚡ Performance Metrics:")
+        print("\n⚡ Performance Metrics:")
         print(f"   Total files: {results['total_files']}")
         print(f"   Min time:    {stats['min']*1000:.0f}ms")
         print(f"   Max time:    {stats['max']*1000:.0f}ms")
@@ -164,7 +179,7 @@ def print_comprehensive_report(results: Dict) -> None:
         # By file type
         by_type = perf.get("by_type", {})
         if by_type:
-            print(f"\n📋 Performance by File Type:")
+            print("\n📋 Performance by File Type:")
             for file_type, type_stats in sorted(by_type.items()):
                 print(
                     f"   {file_type:12} {type_stats['count']:3} files, "
@@ -175,7 +190,7 @@ def print_comprehensive_report(results: Dict) -> None:
     # Accuracy section
     accuracy = results.get("accuracy")
     if accuracy and "error" not in accuracy:
-        print(f"\n🎯 Accuracy Metrics:")
+        print("\n🎯 Accuracy Metrics:")
         metrics = accuracy["metrics"]
         print(f"   Overall Accuracy: {metrics['accuracy']:.2f}%")
         print(f"   Precision:        {metrics['precision']:.2f}%")
@@ -183,12 +198,12 @@ def print_comprehensive_report(results: Dict) -> None:
         print(f"   F1-Score:         {metrics['f1_score']:.2f}%")
 
         cm = accuracy["confusion_matrix"]
-        print(f"\n   Confusion Matrix:")
+        print("\n   Confusion Matrix:")
         print(f"     TP: {cm['true_positive']}, FP: {cm['false_positive']}")
         print(f"     TN: {cm['true_negative']}, FN: {cm['false_negative']}")
 
         if accuracy.get("by_type"):
-            print(f"\n   Accuracy by File Type:")
+            print("\n   Accuracy by File Type:")
             for file_type, type_stats in sorted(accuracy["by_type"].items()):
                 print(
                     f"     {file_type:12} {type_stats['accuracy']:.1f}% "
@@ -197,7 +212,7 @@ def print_comprehensive_report(results: Dict) -> None:
     elif accuracy and "error" in accuracy:
         print(f"\n⚠️  Accuracy validation skipped: {accuracy['error']}")
     else:
-        print(f"\n⚠️  Accuracy validation skipped (no ground truth file)")
+        print("\n⚠️  Accuracy validation skipped (no ground truth file)")
 
     print("\n" + "=" * 80)
 
@@ -230,6 +245,11 @@ def main():
         help="Maximum number of files to process",
     )
     parser.add_argument(
+        "--max-size-mb",
+        type=float,
+        help="Only process files <= this size in MB (e.g. 0.5 for 500KB)",
+    )
+    parser.add_argument(
         "--output",
         "-o",
         type=str,
@@ -250,6 +270,7 @@ def main():
         layout_aware=args.layout_aware,
         page_level=args.page_level,
         max_files=args.max_files,
+        max_size_mb=args.max_size_mb,
     )
 
     if "error" in results:
@@ -268,4 +289,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

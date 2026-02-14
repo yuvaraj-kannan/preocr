@@ -180,7 +180,48 @@ def needs_ocr(
 
     # Step 5: Confidence check → OpenCV layout refinement (if needed)
     # If confidence is low OR layout_aware is True, use OpenCV to refine the decision
-    if mime == "application/pdf" and (layout_aware or confidence < refinement_threshold):
+    run_opencv = mime == "application/pdf" and (layout_aware or confidence < refinement_threshold)
+    if run_opencv and config:
+        # Optional heuristics: skip OpenCV when document clearly looks digital
+        c = config
+        file_size_mb = collected_signals.get("file_size", 0) / (1024.0 * 1024.0)
+        page_count = collected_signals.get("page_count", 0)
+        text_coverage = collected_signals.get("text_coverage")
+        image_coverage = collected_signals.get("image_coverage")
+        has_skip_triggers = (c.skip_opencv_if_file_size_mb is not None) or (
+            c.skip_opencv_if_page_count is not None
+        )
+        if has_skip_triggers:
+            # Never skip when image_coverage exceeds threshold (suggests scanned content)
+            image_ok = c.skip_opencv_max_image_coverage is None or (
+                image_coverage is not None and image_coverage <= c.skip_opencv_max_image_coverage
+            )
+            file_size_ok = (
+                c.skip_opencv_if_file_size_mb is not None
+                and file_size_mb >= c.skip_opencv_if_file_size_mb
+            )
+            text_ok_for_pages = c.skip_opencv_text_coverage_min is None or (
+                text_coverage is not None and text_coverage >= c.skip_opencv_text_coverage_min
+            )
+            page_count_ok = (
+                c.skip_opencv_if_page_count is not None
+                and page_count >= c.skip_opencv_if_page_count
+                and text_ok_for_pages
+            )
+            confidence_ok = (
+                c.skip_opencv_confidence_min is None or confidence >= c.skip_opencv_confidence_min
+            )
+            strong_digital_signal = (file_size_ok or page_count_ok) and image_ok and confidence_ok
+            if strong_digital_signal:
+                run_opencv = False
+                logger.debug(
+                    "Skipping OpenCV refinement (strong digital signals: file_size_mb=%.3f, "
+                    "page_count=%d, text_coverage=%s)",
+                    file_size_mb,
+                    page_count,
+                    text_coverage,
+                )
+    if run_opencv:
         if progress_callback:
             progress_callback("opencv_analysis", 0.7)
         opencv_result = opencv_layout_module.analyze_with_opencv(str(path), page_level=page_level)
@@ -230,10 +271,34 @@ def needs_ocr(
             if page_analysis.get("overall_needs_ocr") is not None:
                 # Validate that page-level analysis is complete and consistent
                 if len(pages_list) == page_count:
-                    result["needs_ocr"] = page_analysis["overall_needs_ocr"]
-                    result["confidence"] = page_analysis["overall_confidence"]
-                    result["reason_code"] = page_analysis["overall_reason_code"]
-                    result["reason"] = page_analysis["overall_reason"]
+                    # Do not override when document-level has strong digital signals
+                    # (avoids 1 sparse page flipping whole doc to needs_ocr=True)
+                    tc = collected_signals.get("text_coverage") or 0.0
+                    ic = collected_signals.get("image_coverage") or 0.0
+                    text_len = collected_signals.get("text_length", 0)
+                    text_density = collected_signals.get("text_density") or 0.0
+                    c = config or constants.Config()
+                    digital_guard = (
+                        not needs_ocr_flag
+                        and c.digital_bias_text_coverage_min is not None
+                        and c.digital_bias_image_coverage_max is not None
+                        and tc >= c.digital_bias_text_coverage_min
+                        and ic <= c.digital_bias_image_coverage_max
+                        and text_len >= c.min_text_length
+                    )
+                    table_guard = (
+                        not needs_ocr_flag
+                        and c.table_bias_text_density_min is not None
+                        and c.table_bias_text_coverage_min is not None
+                        and text_density >= c.table_bias_text_density_min
+                        and tc >= c.table_bias_text_coverage_min
+                        and text_len >= c.min_text_length
+                    )
+                    if not (digital_guard or table_guard):
+                        result["needs_ocr"] = page_analysis["overall_needs_ocr"]
+                        result["confidence"] = page_analysis["overall_confidence"]
+                        result["reason_code"] = page_analysis["overall_reason_code"]
+                        result["reason"] = page_analysis["overall_reason"]
                 else:
                     logger.warning(
                         f"Page-level analysis incomplete: {len(pages_list)} pages found, "

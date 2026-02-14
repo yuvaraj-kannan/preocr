@@ -41,8 +41,10 @@ def collect_signals(
     file_size = path.stat().st_size if path.exists() else 0
 
     text_length = 0
+    page_count = 0
     if text_result:
         text_length = text_result.get("text_length", 0)
+        page_count = text_result.get("page_count", 0)
 
     image_entropy = None
     if image_result:
@@ -53,6 +55,7 @@ def collect_signals(
         "extension": file_info.get("extension", ""),
         "is_binary": file_info.get("is_binary", True),
         "text_length": text_length,
+        "page_count": page_count,
         "image_entropy": image_entropy,
         "file_size": file_size,
         "has_text": text_length > 0,

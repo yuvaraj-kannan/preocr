@@ -1,0 +1,440 @@
+{
+  "n_files": 30,
+  "directory": "benchmarkdata",
+  "domain_mode": "generic",
+  "recursive": true,
+  "summary": {
+    "agreement_count": 27,
+    "agreement_rate": 0.9,
+    "baseline_needs_ocr_count": 3,
+    "planner_needs_ocr_count": 0,
+    "baseline_avg_time_s": 28.871,
+    "planner_avg_time_s": 36.916,
+    "total_baseline_time_s": 866.12,
+    "total_planner_time_s": 1107.48
+  },
+  "baseline_decisions": [
+    {
+      "file": "2019668506.pdf",
+      "needs_ocr": false,
+      "time_s": 5.889,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2019670779.pdf",
+      "needs_ocr": false,
+      "time_s": 41.81,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2019713402.pdf",
+      "needs_ocr": false,
+      "time_s": 54.751,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2019713412.pdf",
+      "needs_ocr": false,
+      "time_s": 32.484,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.207.pdf",
+      "needs_ocr": false,
+      "time_s": 13.676,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.408.pdf",
+      "needs_ocr": false,
+      "time_s": 14.395,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.423.pdf",
+      "needs_ocr": false,
+      "time_s": 11.053,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.45.pdf",
+      "needs_ocr": false,
+      "time_s": 10.226,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.48.pdf",
+      "needs_ocr": false,
+      "time_s": 12.275,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.acl-main.653.pdf",
+      "needs_ocr": false,
+      "time_s": 24.869,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.emnlp-main.213.pdf",
+      "needs_ocr": false,
+      "time_s": 13.169,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.findings-emnlp.139.pdf",
+      "needs_ocr": false,
+      "time_s": 9.32,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.sltu-1.28.pdf",
+      "needs_ocr": false,
+      "time_s": 7.922,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020.starsem-1.17.pdf",
+      "needs_ocr": false,
+      "time_s": 13.431,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020714994.pdf",
+      "needs_ocr": false,
+      "time_s": 3.059,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020714995.pdf",
+      "needs_ocr": true,
+      "time_s": 153.816,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020714997.pdf",
+      "needs_ocr": true,
+      "time_s": 80.589,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020714998.pdf",
+      "needs_ocr": false,
+      "time_s": 8.772,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020714999.pdf",
+      "needs_ocr": false,
+      "time_s": 50.741,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2020720029.pdf",
+      "needs_ocr": false,
+      "time_s": 55.621,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021666100.pdf",
+      "needs_ocr": false,
+      "time_s": 103.374,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021687414.pdf",
+      "needs_ocr": true,
+      "time_s": 83.788,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021687415.pdf",
+      "needs_ocr": false,
+      "time_s": 15.957,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021687416.pdf",
+      "needs_ocr": false,
+      "time_s": 12.284,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021687417.pdf",
+      "needs_ocr": false,
+      "time_s": 0.631,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021687418.pdf",
+      "needs_ocr": false,
+      "time_s": 2.667,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021699566.pdf",
+      "needs_ocr": false,
+      "time_s": 13.69,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "2021700463.pdf",
+      "needs_ocr": false,
+      "time_s": 13.617,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "20220222.pdf",
+      "needs_ocr": false,
+      "time_s": 1.448,
+      "page_level": true,
+      "layout_aware": true
+    },
+    {
+      "file": "20220301.pdf",
+      "needs_ocr": false,
+      "time_s": 0.8,
+      "page_level": true,
+      "layout_aware": true
+    }
+  ],
+  "planner_decisions": [
+    {
+      "file": "2019668506.pdf",
+      "needs_ocr": false,
+      "time_s": 6.986,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2019670779.pdf",
+      "needs_ocr": false,
+      "time_s": 43.712,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2019713402.pdf",
+      "needs_ocr": false,
+      "time_s": 83.656,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2019713412.pdf",
+      "needs_ocr": false,
+      "time_s": 32.598,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.207.pdf",
+      "needs_ocr": false,
+      "time_s": 12.936,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.408.pdf",
+      "needs_ocr": false,
+      "time_s": 13.322,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.423.pdf",
+      "needs_ocr": false,
+      "time_s": 11.15,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.45.pdf",
+      "needs_ocr": false,
+      "time_s": 10.604,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.48.pdf",
+      "needs_ocr": false,
+      "time_s": 12.415,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.acl-main.653.pdf",
+      "needs_ocr": false,
+      "time_s": 37.358,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.emnlp-main.213.pdf",
+      "needs_ocr": false,
+      "time_s": 19.685,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.findings-emnlp.139.pdf",
+      "needs_ocr": false,
+      "time_s": 14.8,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.sltu-1.28.pdf",
+      "needs_ocr": false,
+      "time_s": 12.803,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020.starsem-1.17.pdf",
+      "needs_ocr": false,
+      "time_s": 13.219,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020714994.pdf",
+      "needs_ocr": false,
+      "time_s": 2.94,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020714995.pdf",
+      "needs_ocr": false,
+      "time_s": 237.185,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020714997.pdf",
+      "needs_ocr": false,
+      "time_s": 115.018,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020714998.pdf",
+      "needs_ocr": false,
+      "time_s": 8.899,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020714999.pdf",
+      "needs_ocr": false,
+      "time_s": 77.4,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2020720029.pdf",
+      "needs_ocr": false,
+      "time_s": 57.94,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021666100.pdf",
+      "needs_ocr": false,
+      "time_s": 156.045,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021687414.pdf",
+      "needs_ocr": false,
+      "time_s": 56.586,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021687415.pdf",
+      "needs_ocr": false,
+      "time_s": 15.309,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021687416.pdf",
+      "needs_ocr": false,
+      "time_s": 12.123,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021687417.pdf",
+      "needs_ocr": false,
+      "time_s": 1.408,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021687418.pdf",
+      "needs_ocr": false,
+      "time_s": 2.659,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021699566.pdf",
+      "needs_ocr": false,
+      "time_s": 14.444,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "2021700463.pdf",
+      "needs_ocr": false,
+      "time_s": 21.687,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "20220222.pdf",
+      "needs_ocr": false,
+      "time_s": 1.331,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    },
+    {
+      "file": "20220301.pdf",
+      "needs_ocr": false,
+      "time_s": 1.269,
+      "pages_needing_ocr": [],
+      "decision_version": "intent-aware-v1"
+    }
+  ]
+}

@@ -6,8 +6,8 @@ from preocr import needs_ocr
 
 def main():
     """Demonstrate basic PreOCR usage."""
-    # Use real files from the data-source-formats directory
-    data_dir = Path(__file__).parent.parent / "data-source-formats"
+    # Use real files from the datasets directory
+    data_dir = Path(__file__).parent.parent / "datasets"
     
     files = [
         data_dir / "product-manual.pdf",
