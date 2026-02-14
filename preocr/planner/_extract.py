@@ -1,17 +1,24 @@
 """Helper to extract per-page text from PDFs when not provided by caller."""
 
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional
+
+pdfplumber: Optional[Any] = None
+fitz: Optional[Any] = None
 
 try:
-    import pdfplumber
+    import pdfplumber as _pdfplumber  # noqa: F401
+
+    pdfplumber = _pdfplumber
 except ImportError:
-    pdfplumber = None
+    pass
 
 try:
-    import fitz
+    import fitz as _fitz  # noqa: F401
+
+    fitz = _fitz
 except ImportError:
-    fitz = None
+    pass
 
 
 def extract_per_page_texts(file_path: str) -> List[str]:
@@ -42,6 +49,7 @@ def extract_per_page_texts(file_path: str) -> List[str]:
 
 def _extract_pdfplumber(path: Path) -> List[str]:
     """Extract per-page text using pdfplumber."""
+    assert pdfplumber is not None
     texts = []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
@@ -55,6 +63,7 @@ def _extract_pdfplumber(path: Path) -> List[str]:
 
 def _extract_pymupdf(path: Path) -> List[str]:
     """Extract per-page text using PyMuPDF."""
+    assert fitz is not None
     texts = []
     doc = fitz.open(path)
     try:

@@ -154,11 +154,11 @@ def plan_ocr_for_document(
         f"({override_count} overrides, {scored_count} scored)."
     )
 
-    metrics = {
+    metrics: Dict[str, Any] = {
         "terminal_override": override_count,
         "scored": scored_count,
     }
-    override_reasons = {}
+    override_reasons: Dict[str, int] = {}
     for d in decisions:
         if d.decision_type == "terminal_override":
             reason = d.debug.get("override_reason", "unknown")

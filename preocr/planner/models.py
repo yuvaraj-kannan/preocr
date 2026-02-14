@@ -6,7 +6,7 @@ decision (need vs no-need for OCR), NOT OCR accuracy or text recognition quality
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import AbstractSet, Any, Dict, List, Optional
 
 
 @dataclass
@@ -16,7 +16,7 @@ class PageIntent:
     labels: List[str]
     scores: Dict[str, float]
 
-    def get_critical_score(self, critical_intents: set) -> float:
+    def get_critical_score(self, critical_intents: AbstractSet[str]) -> float:
         """Return the maximum score among OCR-critical intents, or 0.0 if none match."""
         return max(
             (self.scores.get(label, 0.0) for label in critical_intents),

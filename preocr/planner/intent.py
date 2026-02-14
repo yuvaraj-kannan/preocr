@@ -105,10 +105,12 @@ def classify_medical_intent(
             if isinstance(item, tuple):
                 if len(item) == 1:
                     pat = re.compile(item[0])
-                else:
+                elif len(item) >= 2:
                     pat = re.compile(item[0], item[1])
+                else:
+                    pat = re.compile(str(item))
             else:
-                pat = re.compile(str(item))
+                pat = re.compile(str(item))  # type: ignore[unreachable]
             matches = pat.findall(text)
             if matches:
                 count = len(matches)

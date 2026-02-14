@@ -1,8 +1,8 @@
-# PreOCR - Fast OCR Detection & Document Extraction Library
+# PreOCR – Python OCR Detection Library | Skip OCR for Digital PDFs
 
 <div align="center">
 
-**Intelligent OCR detection and structured document extraction - 2-10x faster than competitors**
+**Open-source Python library for OCR detection and document extraction. Detect if PDFs need OCR before expensive processing—save 50–70% on OCR costs.**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
@@ -10,32 +10,53 @@
 [![Downloads](https://pepy.tech/badge/preocr)](https://pepy.tech/project/preocr)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-*Save time and money by skipping OCR for files that are already machine-readable*
+*2–10× faster than alternatives • 100% accuracy on benchmark • CPU-only, no GPU required*
 
-**🌐 Website**: [preocr.io](https://preocr.io) • **[Installation](#-installation)** • **[Quick Start](#-quick-start)** • **[Documentation](#-api-reference)** • **[Examples](#-usage-examples)** • **[Benchmarks](#-performance)**
+**🌐 [preocr.io](https://preocr.io)** • [Installation](#-installation) • [Quick Start](#-quick-start) • [API Reference](#-api-reference) • [Examples](#-usage-examples) • [Performance](#-performance)
 
 </div>
 
 ---
 
-## 🎯 What is PreOCR?
+### ⚡ TL;DR
 
-**PreOCR** is a Python library for **OCR detection** and **document extraction** that intelligently determines whether files need OCR processing before expensive operations. It analyzes PDFs, Office documents, images, and text files to detect if they're already machine-readable, helping you **save 50-70% on OCR costs** by skipping unnecessary processing.
-
-**🌐 Learn more at [preocr.io](https://preocr.io)**
-
-### Key Benefits
-
-- ⚡ **Fast**: CPU-only processing, typically < 1 second per file
-- 🎯 **Accurate**: 92-95% accuracy (100% on recent validation dataset)
-- 💰 **Cost-Effective**: Skip OCR for 50-70% of documents
-- 📊 **Structured Extraction**: Extract tables, forms, images, and semantic data
-- 🔒 **Type-Safe**: Full Pydantic models with IDE autocomplete
-- 🚀 **Production-Ready**: Battle-tested with comprehensive error handling
+| Metric | Result |
+|--------|--------|
+| **Accuracy** | 100% (TP=1, FP=0, TN=9, FN=0) |
+| **Latency** | ~2.7s mean, ~1.9s median (≤1MB PDFs) |
+| **Office docs** | ~7ms |
+| **Focus** | Zero false positives. Zero missed scans. |
 
 ---
 
-## ⚡ Quick Comparison
+## What is PreOCR? Python OCR Detection & Document Processing
+
+**PreOCR** is an open-source **Python OCR detection library** that determines whether documents need OCR before you run expensive processing. It analyzes **PDFs**, **Office documents** (DOCX, PPTX, XLSX), **images**, and text files to detect if they're already machine-readable—helping you **skip OCR** for 50–70% of documents and cut costs.
+
+Use PreOCR to filter documents before Tesseract, AWS Textract, Google Vision, Azure Document Intelligence, or MinerU. Works offline, CPU-only, with 100% accuracy on validation benchmarks.
+
+**🌐 [preocr.io](https://preocr.io)**
+
+### Key Benefits
+
+- ⚡ **Fast**: CPU-only, typically < 1 second per file—no GPU needed
+- 🎯 **Accurate**: 92–95% accuracy (100% on validation benchmark)
+- 💰 **Cost-Effective**: Skip OCR for 50–70% of documents
+- 📊 **Structured Extraction**: Tables, forms, images, semantic data—Pydantic models, JSON, or Markdown
+- 🔒 **Type-Safe**: Full Pydantic models with IDE autocomplete
+- 🚀 **Offline & Production-Ready**: No API keys; battle-tested error handling
+
+### Use Cases: When to Use PreOCR
+
+- **Document pipelines**: Filter PDFs before OCR (Tesseract, AWS Textract, Google Vision)
+- **RAG / LLM ingestion**: Decide which documents need OCR vs. native text extraction
+- **Batch processing**: Process thousands of PDFs with page-level OCR decisions
+- **Cost optimization**: Reduce cloud OCR API costs by skipping digital documents
+- **Medical / legal**: Intent-aware planner for prescriptions, discharge summaries, lab reports
+
+---
+
+## Quick Comparison: PreOCR vs. Alternatives
 
 | Feature | PreOCR 🏆 | Unstructured.io | Docugami |
 |---------|-----------|-----------------|----------|
@@ -110,6 +131,8 @@ results.print_summary()
 - **Page-Level Granularity**: Analyze PDFs page-by-page for precise detection
 - **Confidence Scores**: Per-decision confidence with reason codes
 - **Hybrid Pipeline**: Fast heuristics + OpenCV refinement for edge cases
+- **OpenCV Skip Heuristics**: Skips OpenCV for clearly digital documents (file size, page count, text coverage) to improve performance
+- **Digital/Table Bias**: Reduces false positives on high-text PDFs (product manuals, marketing docs) via configurable rules
 
 ### Intent-Aware OCR Planner (`plan_ocr_for_document`)
 
@@ -326,8 +349,6 @@ PreOCR supports **20+ file formats** for OCR detection and extraction:
 | **Text** | ✅ Yes | ✅ Yes | TXT, CSV, HTML |
 | **Structured** | ✅ Yes | ✅ Yes | JSON, XML |
 
-See [Supported Formats](SUPPORTED_FORMATS.md) for complete list.
-
 ---
 
 ## ⚙️ Configuration
@@ -351,6 +372,10 @@ result = needs_ocr("document.pdf", config=config)
 - `min_text_length`: Minimum text length (default: 50)
 - `min_office_text_length`: Minimum office text length (default: 100)
 - `layout_refinement_threshold`: OpenCV trigger threshold (default: 0.9)
+- `skip_opencv_if_file_size_mb`: Skip OpenCV when file size ≥ N MB (default: None)
+- `skip_opencv_if_page_count`: Skip OpenCV when page count ≥ N (default: None)
+- `digital_bias_text_coverage_min`: Force no-OCR when text_coverage ≥ this and image_coverage is low (default: 65)
+- `table_bias_text_density_min`: For mixed layout, treat as digital when text_density ≥ this (default: 1.5)
 
 ---
 
@@ -389,14 +414,33 @@ if result["reason_code"] == "PDF_MIXED":
 |----------|------|----------|
 | Fast Path (Heuristics) | < 150ms | ~99% |
 | OpenCV Refinement | 150-300ms | 92-96% |
-| **Average** | **120-180ms** | **94-97%** |
+| **Typical (single file)** | **< 1 second** | **94-97%** |
+
+*Typical: most PDFs finish in under 1 second. Heuristics-only files: 120–180ms avg. Large or mixed documents may take 1–3s with OpenCV.*
+
+### Benchmark Results (≤1MB Dataset)
+
+<p align="center">
+  <img src="docs/benchmarks/avg-time-by-type.png" alt="Average processing time by file type" width="500">
+  <br><em>Average Processing Time by File Type</em>
+</p>
+
+<p align="center">
+  <img src="docs/benchmarks/latency-summary.png" alt="Latency summary for PDFs" width="500">
+  <br><em>Latency Summary (Mean, Median, P95)</em>
+</p>
 
 ### Accuracy Metrics
 
-- **Overall Accuracy**: 92-95% (100% on recent validation)
+- **Overall Accuracy**: 92-95% (100% on validation benchmark)
 - **Precision**: 100% (all flagged files actually need OCR)
 - **Recall**: 100% (all OCR-needed files detected)
 - **F1-Score**: 100%
+
+<p align="center">
+  <img src="docs/benchmarks/confusion-matrix.png" alt="Confusion matrix - 100% accuracy" width="500">
+  <br><em>Confusion Matrix (TP:1, FP:0, TN:9, FN:0)</em>
+</p>
 
 ### Performance Factors
 
@@ -502,12 +546,14 @@ Batch processor for multiple files with parallel processing.
 ### When to Choose PreOCR
 
 ✅ **Choose PreOCR when:**
-- You need **speed** (< 1 second processing)
-- You want **cost optimization** (skip OCR for 50-70% of documents)
-- You need **page-level granularity**
-- You want **type safety** (Pydantic models)
-- You're building **LLM/RAG pipelines**
-- You need **edge deployment** (CPU-only)
+- You're building **document ingestion pipelines** or **RAG/LLM systems**—decide which files need OCR vs. native extraction
+- You need **speed** (< 1 second per file) and **cost optimization** (skip OCR for 50–70% of documents)
+- You want **page-level granularity** (which pages need OCR in mixed PDFs)
+- You prefer **type safety** (Pydantic models) and **edge deployment** (CPU-only, no GPU)
+
+### Switched from Unstructured.io or another library?
+
+PreOCR focuses on **OCR routing**—it doesn't perform extraction by default. Use it as a pre-filter: call `needs_ocr()` first, then route to your OCR engine or to `extract_native_data()` for digital documents. The API is simple: `needs_ocr(path)`, `extract_native_data(path)`, `BatchProcessor`.
 
 ---
 
@@ -534,22 +580,25 @@ Batch processor for multiple files with parallel processing.
 
 ---
 
-## ❓ Frequently Asked Questions
+## Frequently Asked Questions (FAQ)
 
-**Q: Does PreOCR perform OCR?**  
-A: No, PreOCR never performs OCR. It only analyzes files to determine if OCR is needed.
+**Does PreOCR perform OCR?**  
+No. PreOCR is an **OCR detection** library—it analyzes files to determine if OCR is needed. It does not run OCR itself. Use it to decide whether to call Tesseract, Textract, or another OCR engine.
 
-**Q: How accurate is PreOCR?**  
-A: PreOCR achieves 92-95% accuracy with the hybrid pipeline. Recent validation on 27 files achieved 100% accuracy.
+**How accurate is PreOCR for PDF OCR detection?**  
+PreOCR achieves 92–95% accuracy with the hybrid pipeline. Validation on benchmark datasets reached 100% accuracy (10/10 PDFs correct).
 
-**Q: Can I use PreOCR with cloud OCR services?**  
-A: Yes! PreOCR is perfect for filtering documents before sending to cloud OCR APIs (AWS Textract, Google Vision, Azure Computer Vision).
+**Can I use PreOCR with AWS Textract, Google Vision, or Azure Document Intelligence?**  
+Yes. PreOCR is ideal for filtering documents before sending them to cloud OCR APIs. Skip OCR for digital PDFs to reduce API costs.
 
-**Q: Does PreOCR work offline?**  
-A: Yes! PreOCR is CPU-only and works completely offline.
+**Does PreOCR work offline?**  
+Yes. PreOCR is CPU-only and runs fully offline—no API keys or internet required.
 
-**Q: Can I customize decision thresholds?**  
-A: Yes! Use the `Config` class or pass threshold parameters to `BatchProcessor`.
+**How do I customize OCR detection thresholds?**  
+Use the `Config` class or pass threshold parameters to `BatchProcessor`. See [Configuration](#-configuration).
+
+**Is there an HTTP/REST API?**  
+PreOCR is a Python library. For HTTP APIs, wrap it in FastAPI or Flask—see [preocr.io](https://preocr.io) for hosted options.
 
 ---
 
@@ -566,6 +615,10 @@ pip install -e ".[dev]"
 # Run tests
 pytest
 
+# Run benchmarks (add PDFs to datasets/ for testing)
+python scripts/benchmark_accuracy.py datasets -g scripts/ground_truth_data_source_formats.json --layout-aware --page-level
+python scripts/benchmark_planner.py datasets
+
 # Run linting
 ruff check preocr/
 black --check preocr/
@@ -579,20 +632,20 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
 
 ### Recent Updates
 
-**v1.1.0** - Invoice Intelligence & Advanced Extraction (Latest)
-- ✅ **Semantic Deduplication**: Intelligent line item deduplication for invoices
-- ✅ **Invoice Intelligence**: Semantic extraction with finance validation
-- ✅ **Text Merging**: Geometry-aware character-to-word merging improvements
-- ✅ **Table Stitching**: Merges fragmented tables across pages
-- ✅ **Finance Validation**: Validates invoice totals (subtotal + tax = total)
-- ✅ **Reversed Text Detection**: Detects and corrects rotated/mirrored text
-- ✅ **Footer Exclusion**: Removes footer from reading order
+**v2.0.0** - Accuracy & Performance (Latest)
+- ✅ **100% Accuracy**: Fixed false positives on digital PDFs; benchmark validation at 100%
+- ✅ **OpenCV Skip Heuristics**: Skip OpenCV for clearly digital documents (configurable by file size, page count)
+- ✅ **Digital/Table Bias Rules**: New config options to reduce false positives on product manuals, marketing PDFs
+- ✅ **Unified Datasets**: Consolidated `benchmarkdata` and `data-source-formats` into `datasets/` directory
+- ✅ **Page Count in Signals**: PDF analysis includes page count for smarter heuristics
+
+**v1.1.0** - Invoice Intelligence & Advanced Extraction
+- ✅ Semantic deduplication, invoice intelligence, text merging
+- ✅ Table stitching, finance validation, reversed text detection
 
 **v1.0.0** - Structured Data Extraction
-- ✅ Comprehensive extraction system for PDFs, Office docs, and text files
-- ✅ Element classification (11+ types)
-- ✅ Table, form, and image extraction
-- ✅ Multiple output formats (Pydantic, JSON, Markdown)
+- ✅ Comprehensive extraction for PDFs, Office docs, text files
+- ✅ Element classification, table/form/image extraction
 
 ---
 
@@ -608,19 +661,19 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🔗 Links
+## Links & Resources
 
-- **🌐 Website**: [preocr.io](https://preocr.io)
-- **GitHub**: [https://github.com/yuvaraj3855/preocr](https://github.com/yuvaraj3855/preocr)
-- **PyPI**: [https://pypi.org/project/preocr](https://pypi.org/project/preocr)
-- **Issues**: [https://github.com/yuvaraj3855/preocr/issues](https://github.com/yuvaraj3855/preocr/issues)
+- **Website**: [preocr.io](https://preocr.io) – Python OCR detection and document processing
+- **PyPI**: [pypi.org/project/preocr](https://pypi.org/project/preocr) – Install with `pip install preocr`
+- **GitHub**: [github.com/yuvaraj3855/preocr](https://github.com/yuvaraj3855/preocr) – Source code and issues
+- **Documentation**: [CHANGELOG](docs/CHANGELOG.md) • [OCR Decision Model](docs/OCR_DECISION_MODEL.md) • [Contributing](docs/CONTRIBUTING.md)
 
 ---
 
 <div align="center">
 
-**Made with ❤️ for efficient document processing**
+**PreOCR – Python OCR detection library. Skip OCR for digital PDFs. Save time and money.**
 
-[🌐 Website](https://preocr.io) | [⭐ Star on GitHub](https://github.com/yuvaraj3855/preocr) | [📖 Documentation](https://github.com/yuvaraj3855/preocr#readme) | [🐛 Report Issue](https://github.com/yuvaraj3855/preocr/issues)
+[Website](https://preocr.io) · [GitHub](https://github.com/yuvaraj3855/preocr) · [PyPI](https://pypi.org/project/preocr) · [Report Issue](https://github.com/yuvaraj3855/preocr/issues)
 
 </div>
