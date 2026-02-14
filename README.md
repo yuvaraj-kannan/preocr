@@ -111,6 +111,15 @@ results.print_summary()
 - **Confidence Scores**: Per-decision confidence with reason codes
 - **Hybrid Pipeline**: Fast heuristics + OpenCV refinement for edge cases
 
+### Intent-Aware OCR Planner (`plan_ocr_for_document`)
+
+- **Medical Domain**: Terminal overrides for prescriptions, diagnosis, discharge summaries, lab reports
+- **Weighted Scoring**: Configurable threshold with safety/balanced/cost modes
+- **Explainability**: Per-page score breakdown (intent, image_dominance, text_weakness)
+- **Evaluation**: Threshold sweep and confusion matrix for calibration
+
+See [docs/OCR_DECISION_MODEL.md](docs/OCR_DECISION_MODEL.md) for the full specification.
+
 ### Document Extraction (`extract_native_data`)
 
 - **Element Classification**: 11+ element types (Title, NarrativeText, Table, Header, Footer, etc.)
@@ -173,6 +182,18 @@ result = needs_ocr("document.pdf")
 print(f"Needs OCR: {result['needs_ocr']}")
 print(f"Confidence: {result['confidence']:.2f}")
 print(f"Reason: {result['reason']}")
+```
+
+#### Intent-Aware Planner (Medical/Domain-Specific)
+
+```python
+from preocr import plan_ocr_for_document
+
+result = plan_ocr_for_document("hospital_discharge.pdf")
+print(f"Needs OCR (any page): {result['needs_ocr_any']}")
+for page in result["pages"]:
+    print(f"  Page {page['page_number']}: needs_ocr={page['needs_ocr']} "
+          f"type={page['decision_type']} score={page['debug']['score']:.2f}")
 ```
 
 #### Layout-Aware Detection

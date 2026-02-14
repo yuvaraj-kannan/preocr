@@ -1,0 +1,90 @@
+{
+  "n_samples": 9,
+  "baseline": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "accuracy": 0.8889,
+    "confusion_matrix": {
+      "tp": 0,
+      "fp": 1,
+      "tn": 8,
+      "fn": 0
+    }
+  },
+  "planner": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "accuracy": 1.0,
+    "confusion_matrix": {
+      "tp": 0,
+      "fp": 0,
+      "tn": 9,
+      "fn": 0
+    }
+  },
+  "planner_threshold": 0.6,
+  "threshold_sweep": {
+    "0.4": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 0.8889,
+      "confusion_matrix": {
+        "tp": 0,
+        "fp": 1,
+        "tn": 8,
+        "fn": 0
+      }
+    },
+    "0.5": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 0.8889,
+      "confusion_matrix": {
+        "tp": 0,
+        "fp": 1,
+        "tn": 8,
+        "fn": 0
+      }
+    },
+    "0.6": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 0.8889,
+      "confusion_matrix": {
+        "tp": 0,
+        "fp": 1,
+        "tn": 8,
+        "fn": 0
+      }
+    },
+    "0.7": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 1.0,
+      "confusion_matrix": {
+        "tp": 0,
+        "fp": 0,
+        "tn": 9,
+        "fn": 0
+      }
+    },
+    "0.8": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "accuracy": 1.0,
+      "confusion_matrix": {
+        "tp": 0,
+        "fp": 0,
+        "tn": 9,
+        "fn": 0
+      }
+    }
+  }
+}

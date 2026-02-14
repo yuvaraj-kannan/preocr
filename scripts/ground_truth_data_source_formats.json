@@ -1,0 +1,11 @@
+[
+  {"file": "data-source-formats/sample-unstructured-paper.pdf", "needs_ocr": false, "notes": "Digital PDF with extractable text"},
+  {"file": "data-source-formats/PrinceCatalogue.pdf", "needs_ocr": false, "notes": "Digital PDF with extractable text"},
+  {"file": "data-source-formats/embedded-images-tables.pdf", "needs_ocr": false, "notes": "Digital PDF with images and tables"},
+  {"file": "data-source-formats/white-paper.pdf", "needs_ocr": false, "notes": "Digital PDF"},
+  {"file": "data-source-formats/product-manual.pdf", "needs_ocr": false, "notes": "Digital PDF"},
+  {"file": "data-source-formats/invoicesample.pdf", "needs_ocr": false, "notes": "Digital PDF invoice"},
+  {"file": "data-source-formats/index.pdf", "needs_ocr": false, "notes": "Digital PDF"},
+  {"file": "data-source-formats/Multiturn-ContosoBenefits.pdf", "needs_ocr": false, "notes": "Digital PDF"},
+  {"file": "data-source-formats/Introducing-surface-laptop-4-and-new-access.pdf", "needs_ocr": false, "notes": "Digital PDF"}
+]
