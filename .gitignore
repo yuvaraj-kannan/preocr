@@ -12,7 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
-benchmarkdata/
+datasets/
 eggs/
 .eggs/
 lib/
@@ -81,8 +81,14 @@ dmypy.json
 test.py
 
 # Test data and results
-data-source-formats/
 extraction_results/
+
+# Benchmark/validation artifacts (generated)
+scripts/benchmark_*results*.json
+scripts/benchmark_planner_results*.json
+scripts/benchmark_data_source_formats.json
+scripts/planner_eval_*.json
+
 # Ad-hoc test scripts (root and scripts/); tests/test_*.py are part of the suite
 /test_*.py
 scripts/test_*.py

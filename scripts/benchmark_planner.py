@@ -3,7 +3,7 @@
 Benchmark baseline (preocr) vs planner on a directory of PDFs.
 
 Runs without ground truth: reports agreement rate, per-method decision counts,
-and per-file results. Supports recursive discovery for nested dirs (e.g. benchmarkdata/0/*.pdf).
+and per-file results. Use datasets/ for a flat directory of PDFs.
 """
 
 import json
@@ -89,24 +89,30 @@ def run_benchmark(
             if baseline_needs == planner_needs:
                 agreement_count += 1
 
-            baseline_decisions.append({
-                "file": str(rel_path),
-                "needs_ocr": baseline_needs,
-                "time_s": round(t1 - t0, 3),
-                "page_level": True,
-                "layout_aware": True,
-            })
-            planner_decisions.append({
-                "file": str(rel_path),
-                "needs_ocr": planner_needs,
-                "time_s": round(t3 - t2, 3),
-                "pages_needing_ocr": plan_result.get("pages_needing_ocr", []),
-                "decision_version": plan_result.get("decision_version", ""),
-            })
+            baseline_decisions.append(
+                {
+                    "file": str(rel_path),
+                    "needs_ocr": baseline_needs,
+                    "time_s": round(t1 - t0, 3),
+                    "page_level": True,
+                    "layout_aware": True,
+                }
+            )
+            planner_decisions.append(
+                {
+                    "file": str(rel_path),
+                    "needs_ocr": planner_needs,
+                    "time_s": round(t3 - t2, 3),
+                    "pages_needing_ocr": plan_result.get("pages_needing_ocr", []),
+                    "decision_version": plan_result.get("decision_version", ""),
+                }
+            )
 
             base_time = round(t1 - t0, 2)
             plan_time = round(t3 - t2, 2)
-            _log(f"  -> baseline: needs_ocr={baseline_needs} ({base_time}s) | planner: needs_ocr={planner_needs} ({plan_time}s) | agree={baseline_needs == planner_needs}")
+            _log(
+                f"  -> baseline: needs_ocr={baseline_needs} ({base_time}s) | planner: needs_ocr={planner_needs} ({plan_time}s) | agree={baseline_needs == planner_needs}"
+            )
 
         except Exception as e:
             _log(f"  -> ERROR: {e}")
@@ -203,18 +209,26 @@ def main():
     print("OCR Planner Benchmark")
     print("=" * 60)
     print(f"\nFiles processed: {n}")
-    print(f"\nBaseline (preocr, page_level=True, layout_aware=True):")
-    print(f"  Flagged needs_ocr: {s['baseline_needs_ocr_count']} ({100*s['baseline_needs_ocr_count']/n:.1f}%)")
+    print("\nBaseline (preocr, page_level=True, layout_aware=True):")
+    print(
+        f"  Flagged needs_ocr: {s['baseline_needs_ocr_count']} ({100*s['baseline_needs_ocr_count']/n:.1f}%)"
+    )
     print(f"  Avg time/file: {s['baseline_avg_time_s']}s")
     print(f"\nPlanner ({args.domain_mode}):")
-    print(f"  Flagged needs_ocr: {s['planner_needs_ocr_count']} ({100*s['planner_needs_ocr_count']/n:.1f}%)")
+    print(
+        f"  Flagged needs_ocr: {s['planner_needs_ocr_count']} ({100*s['planner_needs_ocr_count']/n:.1f}%)"
+    )
     print(f"  Avg time/file: {s['planner_avg_time_s']}s")
     print(f"\nAgreement: {s['agreement_count']}/{n} ({100*s['agreement_rate']:.1f}%)")
     print("=" * 60)
 
     if args.output:
         # Optionally omit per-file details for large outputs
-        out = {k: v for k, v in results.items() if k != "baseline_decisions" and k != "planner_decisions"}
+        out = {
+            k: v
+            for k, v in results.items()
+            if k != "baseline_decisions" and k != "planner_decisions"
+        }
         out["baseline_decisions"] = results["baseline_decisions"]
         out["planner_decisions"] = results["planner_decisions"]
         with open(args.output, "w") as f:

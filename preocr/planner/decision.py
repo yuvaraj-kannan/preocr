@@ -29,7 +29,7 @@ def _compute_ocr_score(
     Returns (score, components_dict).
     """
     intent_contrib = intent.get_critical_score(OCR_CRITICAL_INTENTS) * config.get_intent_weight()
-    image_dominance = _normalize(signals.image_coverage, 0, 100) * config.image_weight
+    image_dominance = _normalize(signals.image_coverage, 0, 100) * config.get_image_weight()
     text_weakness = (1.0 - _normalize(signals.text_coverage, 0, 100)) * config.text_weakness_weight
 
     failsafe_boost = 0.0
@@ -77,9 +77,7 @@ def decide_page(
     }
 
     # Step 1: Hard failsafe override (terminal) – if policy allows
-    if config.failsafe_override_active() and (
-        signals.extraction_failed or signals.layout_missing
-    ):
+    if config.failsafe_override_active() and (signals.extraction_failed or signals.layout_missing):
         return PageOCRDecision(
             needs_ocr=True,
             decision_type="terminal_override",
@@ -100,7 +98,11 @@ def decide_page(
                 reason="OCR-critical intent (e.g. prescription) with high confidence.",
                 confidence=critical_score,
                 decision_version=config.decision_version,
-                debug={**debug_base, "terminal_override": True, "override_reason": "intent_critical"},
+                debug={
+                    **debug_base,
+                    "terminal_override": True,
+                    "override_reason": "intent_critical",
+                },
                 page_number=signals.page_number,
             )
 

@@ -9,7 +9,7 @@ It calculates precision, recall, F1-score, and overall accuracy metrics.
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from collections import defaultdict
 
 from preocr import needs_ocr
@@ -72,7 +72,7 @@ class AccuracyValidator:
             or self.ground_truth.get(file_abs)  # Absolute path
             or self.ground_truth.get(filename)  # Just filename
         )
-        
+
         # Also try matching with normalized paths
         if ground_truth_needs_ocr is None:
             for key, value in self.ground_truth.items():
@@ -134,7 +134,18 @@ class AccuracyValidator:
             List of validation results
         """
         if extensions is None:
-            extensions = [".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".docx", ".pptx", ".xlsx", ".txt"]
+            extensions = [
+                ".pdf",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".tiff",
+                ".tif",
+                ".docx",
+                ".pptx",
+                ".xlsx",
+                ".txt",
+            ]
 
         results = []
         files = []
@@ -150,9 +161,9 @@ class AccuracyValidator:
             result = self.validate_file(file_path, layout_aware=layout_aware, page_level=page_level)
             results.append(result)
             if result.get("skipped"):
-                print(f"⏭️  Skipped")
+                print("⏭️  Skipped")
             elif result.get("correct"):
-                print(f"✅ Correct")
+                print("✅ Correct")
             else:
                 print(f"❌ Wrong (GT: {result['ground_truth']}, Pred: {result['predicted']})")
 
@@ -213,7 +224,9 @@ class AccuracyValidator:
         f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
 
         # Breakdown by file type
-        by_type = defaultdict(lambda: {"total": 0, "correct": 0, "tp": 0, "fp": 0, "tn": 0, "fn": 0})
+        by_type = defaultdict(
+            lambda: {"total": 0, "correct": 0, "tp": 0, "fp": 0, "tn": 0, "fn": 0}
+        )
         for result in valid_results:
             file_type = result.get("file_type", "unknown")
             by_type[file_type]["total"] += 1
@@ -277,7 +290,7 @@ class AccuracyValidator:
         print("📊 ACCURACY VALIDATION RESULTS")
         print("=" * 80)
 
-        print(f"\n📁 Files:")
+        print("\n📁 Files:")
         print(f"   Total: {metrics['total_files']}")
         print(f"   Validated: {metrics['validated_files']}")
         if metrics["skipped_files"] > 0:
@@ -289,15 +302,21 @@ class AccuracyValidator:
 
         # Confusion matrix
         cm = metrics["confusion_matrix"]
-        print(f"\n📊 Confusion Matrix:")
-        print(f"   True Positive (TP):  {cm['true_positive']:3} - Correctly identified as needing OCR")
-        print(f"   False Positive (FP): {cm['false_positive']:3} - Incorrectly flagged as needing OCR")
-        print(f"   True Negative (TN):  {cm['true_negative']:3} - Correctly identified as not needing OCR")
+        print("\n📊 Confusion Matrix:")
+        print(
+            f"   True Positive (TP):  {cm['true_positive']:3} - Correctly identified as needing OCR"
+        )
+        print(
+            f"   False Positive (FP): {cm['false_positive']:3} - Incorrectly flagged as needing OCR"
+        )
+        print(
+            f"   True Negative (TN):  {cm['true_negative']:3} - Correctly identified as not needing OCR"
+        )
         print(f"   False Negative (FN): {cm['false_negative']:3} - Missed files that need OCR")
 
         # Overall metrics
         m = metrics["metrics"]
-        print(f"\n🎯 Overall Metrics:")
+        print("\n🎯 Overall Metrics:")
         print(f"   Accuracy:  {m['accuracy']:.2f}%")
         print(f"   Precision: {m['precision']:.2f}%")
         print(f"   Recall:    {m['recall']:.2f}%")
@@ -305,12 +324,14 @@ class AccuracyValidator:
 
         # Breakdown by file type
         if metrics["by_type"]:
-            print(f"\n📋 Accuracy by File Type:")
+            print("\n📋 Accuracy by File Type:")
             for file_type, stats in sorted(metrics["by_type"].items()):
                 print(
                     f"   {file_type:12} {stats['accuracy']:5.1f}% ({stats['correct']}/{stats['total']} files)"
                 )
-                print(f"                  Precision: {stats['precision']:.1f}%, Recall: {stats['recall']:.1f}%")
+                print(
+                    f"                  Precision: {stats['precision']:.1f}%, Recall: {stats['recall']:.1f}%"
+                )
 
         # Show errors
         errors = [r for r in results if not r.get("skipped") and not r.get("correct")]
@@ -336,7 +357,18 @@ def create_ground_truth_template(directory: Path, output_file: str = "ground_tru
         directory: Directory containing files to create template for
         output_file: Output JSON file path
     """
-    extensions = [".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".docx", ".pptx", ".xlsx", ".txt"]
+    extensions = [
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tiff",
+        ".tif",
+        ".docx",
+        ".pptx",
+        ".xlsx",
+        ".txt",
+    ]
     files = []
     for ext in extensions:
         files.extend(directory.glob(f"*{ext}"))
@@ -359,7 +391,7 @@ def create_ground_truth_template(directory: Path, output_file: str = "ground_tru
 
     print(f"✅ Created ground truth template: {output_file}")
     print(f"   Found {len(files)} files")
-    print(f"   Please edit the file and set 'needs_ocr' to True or False for each file")
+    print("   Please edit the file and set 'needs_ocr' to True or False for each file")
 
 
 def main():
@@ -424,7 +456,7 @@ def main():
     if not validator.ground_truth:
         print(f"⚠️  Warning: No ground truth file found at {args.ground_truth}")
         print(f"   Create one with: python validate_accuracy.py --create-template {directory}")
-        print(f"   Or provide one with: --ground-truth <path>")
+        print("   Or provide one with: --ground-truth <path>")
         sys.exit(1)
 
     # Validate files
@@ -451,4 +483,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

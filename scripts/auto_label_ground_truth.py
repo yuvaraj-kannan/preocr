@@ -47,7 +47,7 @@ def auto_label_ground_truth(ground_truth_file: str) -> None:
 
     for i, item in enumerate(data, 1):
         file_path = Path(item["file"])
-        
+
         # Skip if already labeled
         if item.get("needs_ocr") is not None:
             print(f"[{i}/{len(data)}] {file_path.name} - Already labeled: {item['needs_ocr']}")
@@ -59,13 +59,13 @@ def auto_label_ground_truth(ground_truth_file: str) -> None:
             item["needs_ocr"] = False
             item["notes"] = "Text file - auto-labeled"
             print(f"[{i}/{len(data)}] {file_path.name} - ✅ Labeled: False (text file)")
-        
+
         elif file_path.suffix.lower() == ".pdf":
             # Check PDF for extractable text
             if not file_path.exists():
                 print(f"[{i}/{len(data)}] {file_path.name} - ⚠️  File not found")
                 continue
-            
+
             has_text = check_pdf_has_text(file_path)
             if has_text is True:
                 item["needs_ocr"] = False
@@ -77,7 +77,7 @@ def auto_label_ground_truth(ground_truth_file: str) -> None:
                 print(f"[{i}/{len(data)}] {file_path.name} - ✅ Labeled: True (no text)")
             else:
                 print(f"[{i}/{len(data)}] {file_path.name} - ⚠️  Could not determine")
-        
+
         else:
             # Images and other files - assume they need OCR
             item["needs_ocr"] = True
@@ -98,4 +98,3 @@ if __name__ == "__main__":
         sys.exit(1)
 
     auto_label_ground_truth(sys.argv[1])
-

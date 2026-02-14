@@ -12,7 +12,7 @@ Supports:
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # Add scripts to path for standalone run
 sys.path.insert(0, str(Path(__file__).parent))

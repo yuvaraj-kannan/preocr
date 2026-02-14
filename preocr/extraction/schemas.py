@@ -1,6 +1,6 @@
 """Structured output schemas for PreOCR extraction."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Dict, Literal, Any
 from enum import Enum
 
@@ -149,8 +149,8 @@ class ExtractionResult(BaseModel):
     # Errors
     errors: List[str] = Field(default_factory=list, description="Extraction errors")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "file_path": "invoice.pdf",
                 "file_type": "pdf",
@@ -169,3 +169,4 @@ class ExtractionResult(BaseModel):
                 "errors": [],
             }
         }
+    )

@@ -15,7 +15,7 @@ def test_collect_signals():
 
     try:
         file_info = filetype.detect_file_type(temp_path)
-        text_result = {"text_length": 12, "text": "Test content"}
+        text_result = {"text_length": 12, "text": "Test content", "page_count": 0}
 
         result = signals.collect_signals(temp_path, file_info, text_result)
 
@@ -27,6 +27,8 @@ def test_collect_signals():
         assert "has_text" in result
         assert result["text_length"] == 12
         assert result["has_text"] is True
+        assert "page_count" in result
+        assert result["page_count"] == 0
     finally:
         Path(temp_path).unlink()
 
@@ -46,5 +48,28 @@ def test_collect_signals_with_image():
         assert result["image_entropy"] == 5.2
         assert result["text_length"] == 0
         assert result["has_text"] is False
+    finally:
+        Path(temp_path).unlink()
+
+
+def test_collect_signals_pdf_with_page_count():
+    """Test that page_count from PDF text extraction is included in signals."""
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(b"%PDF-1.4\n")
+        temp_path = f.name
+
+    try:
+        file_info = filetype.detect_file_type(temp_path)
+        text_result = {
+            "text_length": 500,
+            "text": "x" * 500,
+            "page_count": 3,
+            "method": "pdfplumber",
+        }
+
+        result = signals.collect_signals(temp_path, file_info, text_result)
+
+        assert result["page_count"] == 3
+        assert result["text_length"] == 500
     finally:
         Path(temp_path).unlink()

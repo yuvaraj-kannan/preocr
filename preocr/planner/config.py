@@ -5,7 +5,7 @@ Thresholds are configurable and should be calibrated using false-positive cost
 with page-level ground truth.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -71,6 +71,15 @@ class PlannerConfig:
         if self.domain_mode == "generic":
             return 0.0
         return self.intent_weight
+
+    def get_image_weight(self) -> float:
+        """
+        Image weight for scoring. Lower in generic mode (financial/product PDFs
+        often have images but don't need OCR).
+        """
+        if self.domain_mode == "generic":
+            return 0.2
+        return self.image_weight
 
     def get_override_policy(self) -> str:
         """

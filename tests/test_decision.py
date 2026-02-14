@@ -95,6 +95,27 @@ def test_unknown_binary_needs_ocr():
     assert reason_code is not None
 
 
+def test_digital_bias_high_text_moderate_image():
+    """Test digital bias: text_coverage >= 65 and image_coverage <= 50 → no OCR."""
+    from preocr import Config
+
+    signals = {
+        "mime": "application/pdf",
+        "extension": "pdf",
+        "text_length": 500,
+        "text_coverage": 68.0,
+        "image_coverage": 25.0,
+        "layout_type": "mixed",
+        "is_binary": True,
+    }
+    config = Config()
+    needs, reason, confidence, category, reason_code = decision.decide(signals, config=config)
+    assert needs is False
+    assert category == "structured"
+    assert reason_code == "PDF_DIGITAL"
+    assert "digital bias" in reason.lower() or "high text" in reason.lower()
+
+
 def test_hybrid_rule_high_image_low_text():
     """Test hybrid rule: image_ratio > 0.75 AND text_length < 30 → OCR."""
     signals = {
@@ -141,7 +162,7 @@ def test_calculate_ocr_score():
     )
     assert 0.0 <= ocr_score <= 1.0
     assert ocr_score > 0.6  # Should be high for this scenario
-    
+
     # Test with low image, high text (should have low OCR_SCORE)
     ocr_score2 = decision.calculate_ocr_score(
         text_length=5000,
@@ -160,10 +181,10 @@ def test_calculate_confidence_from_signals_with_ocr_score():
         "text_coverage": 5.0,
         "layout_type": "mixed",
     }
-    
+
     # Calculate OCR_SCORE
     ocr_score = decision.calculate_ocr_score(10, 80.0, 5.0)
-    
+
     # Test for "needs OCR" case
     confidence = decision.calculate_confidence_from_signals(
         signals, needs_ocr=True, ocr_score=ocr_score
@@ -171,7 +192,7 @@ def test_calculate_confidence_from_signals_with_ocr_score():
     assert 0.50 <= confidence <= 0.95
     # Higher OCR_SCORE should give higher confidence for "needs OCR"
     assert confidence > 0.70  # Should be reasonably high
-    
+
     # Test for "no OCR" case
     ocr_score_low = decision.calculate_ocr_score(5000, 10.0, 70.0)
     confidence2 = decision.calculate_confidence_from_signals(
@@ -190,13 +211,13 @@ def test_calculate_confidence_fallback():
         "text_coverage": 0.0,
         # No layout_type = fallback mode
     }
-    
+
     # Test fallback for "no OCR" (digital PDF)
     confidence = decision.calculate_confidence_from_signals(
         signals, needs_ocr=False, ocr_score=None
     )
     assert 0.75 <= confidence <= 0.95  # Should be in fallback range
-    
+
     # Test fallback for "needs OCR" (scanned PDF)
     signals2 = {"text_length": 10}
     confidence2 = decision.calculate_confidence_from_signals(
@@ -213,14 +234,14 @@ def test_confidence_alignment_with_ocr_score():
         "text_coverage": 10.0,
         "layout_type": "mixed",
     }
-    
+
     ocr_score = decision.calculate_ocr_score(20, 75.0, 10.0)
-    
+
     # Get confidence using OCR_SCORE
     confidence = decision.calculate_confidence_from_signals(
         signals, needs_ocr=True, ocr_score=ocr_score
     )
-    
+
     # Confidence should be aligned with OCR_SCORE
     # For needs_ocr=True: confidence = 0.50 + (ocr_score * 0.45)
     expected_confidence = 0.50 + (ocr_score * 0.45)

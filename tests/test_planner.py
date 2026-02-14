@@ -30,7 +30,10 @@ def test_planner_config():
 
     # Generic mode: higher balanced threshold, zero intent weight
     generic_balanced = PlannerConfig(domain_mode="generic", decision_mode="balanced")
-    assert generic_balanced.get_decision_threshold() == generic_balanced.decision_threshold_balanced_generic
+    assert (
+        generic_balanced.get_decision_threshold()
+        == generic_balanced.decision_threshold_balanced_generic
+    )
     assert generic_balanced.get_intent_weight() == 0.0
 
     # Medical mode: standard balanced threshold, intent weight applied
@@ -75,12 +78,12 @@ def test_page_context_signals_from_preocr():
 
 
 @pytest.mark.skipif(
-    not Path("data-source-formats/sample-unstructured-paper.pdf").exists(),
+    not Path("datasets/sample-unstructured-paper.pdf").exists(),
     reason="Test file not available",
 )
 def test_plan_ocr_for_document_digital_pdf():
     """Test planner on a digital PDF."""
-    pdf_path = "data-source-formats/sample-unstructured-paper.pdf"
+    pdf_path = "datasets/sample-unstructured-paper.pdf"
     result = plan_ocr_for_document(pdf_path)
     assert "decision_version" in result
     assert "needs_ocr_any" in result

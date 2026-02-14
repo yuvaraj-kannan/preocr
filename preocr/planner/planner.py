@@ -140,7 +140,9 @@ def plan_ocr_for_document(
 
     total_conf = sum(d.confidence for d in decisions)
     overall_confidence = total_conf / len(decisions) if decisions else 0.5
-    if decisions and (all(d.needs_ocr for d in decisions) or all(not d.needs_ocr for d in decisions)):
+    if decisions and (
+        all(d.needs_ocr for d in decisions) or all(not d.needs_ocr for d in decisions)
+    ):
         overall_confidence = min(overall_confidence + 0.1, 1.0)
     else:
         overall_confidence = max(overall_confidence - 0.1, 0.0)
@@ -206,7 +208,12 @@ def _build_fast_path_result(
             "decision_version": cfg.decision_version,
             "debug": {
                 "score": 0.0,
-                "components": {"intent": 0, "image_dominance": 0, "text_weakness": 0, "failsafe_boost": 0},
+                "components": {
+                    "intent": 0,
+                    "image_dominance": 0,
+                    "text_weakness": 0,
+                    "failsafe_boost": 0,
+                },
                 "terminal_override": False,
                 "fast_path": True,
             },

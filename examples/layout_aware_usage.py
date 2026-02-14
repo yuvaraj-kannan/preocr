@@ -7,12 +7,12 @@ from preocr import needs_ocr
 def main():
     """Demonstrate layout-aware OCR detection."""
     
-    # Use a real PDF file from the data-source-formats directory
-    sample_file = Path(__file__).parent.parent / "data-source-formats" / "product-manual.pdf"
+    # Use a real PDF file from the datasets directory
+    sample_file = Path(__file__).parent.parent / "datasets" / "product-manual.pdf"
     
     if not sample_file.exists():
         print(f"Error: Sample file not found: {sample_file}")
-        print("Please ensure the data-source-formats directory contains PDF files.")
+        print("Please ensure the datasets directory contains PDF files.")
         return
 
     # Example 1: Basic usage (no layout analysis)

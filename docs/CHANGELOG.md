@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-02-14
+
+### Added
+- **OpenCV Skip Heuristics**: Configurable options to skip OpenCV refinement for clearly digital documents, improving performance on large PDFs:
+  - `skip_opencv_if_file_size_mb`: Skip when file exceeds size threshold
+  - `skip_opencv_if_page_count`: Skip when page count exceeds threshold
+  - `skip_opencv_text_coverage_min`, `skip_opencv_confidence_min`, `skip_opencv_max_image_coverage` for fine-grained control
+- **Digital Bias Rules**: New config options (`digital_bias_text_coverage_min`, `digital_bias_image_coverage_max`) to force `needs_ocr=False` for high-text, low-image PDFs that were previously misclassified
+- **Table Bias Rules**: Config options (`table_bias_text_density_min`, `table_bias_text_coverage_min`) for mixed-layout documents with dense text (e.g., tables) to reduce false positives
+- **Page Count in Signals**: PDF analysis now includes `page_count` in collected signals for heuristics and skip logic
+- **Unified Datasets Folder**: Consolidated `benchmarkdata` and `data-source-formats` into a single `datasets/` directory—all test and benchmark documents in one flat folder
+
+### Changed
+- **Dataset Structure**: `benchmarkdata/` and `data-source-formats/` moved into `datasets/`; all documents stored directly with no subfolders
+- **Decision Logic**: Document-level digital and table guards prevent single low-text pages from incorrectly flipping entire document to `needs_ocr=True`
+- **Planner Image Weight**: Lower image weight (0.2) in generic mode for better agreement with core detector
+- **Pydantic Models**: `ExtractionResult` migrated from deprecated `class Config` to `model_config = ConfigDict()` for Pydantic v2 compatibility
+- **Codebase Cleanup**: Full Ruff and Black formatting, removed unused imports, fixed f-string and test return-value warnings
+
+### Fixed
+- **False Positives on Digital PDFs**: Fixed misclassification of digital PDFs (e.g., product manuals, marketing PDFs) that were incorrectly flagged as `needs_ocr=True`—now correctly identified as `needs_ocr=False`
+- **Page-Level Override**: Single low-text pages no longer override document-level digital signals when `digital_guard` or `table_guard` applies
+- **Test Warnings**: Resolved pytest return-not-None warnings in `test_config_thresholds.py`
+
+### Accuracy
+- **100% accuracy** on data-source-formats benchmark (10/10 PDFs correct)
+- **100% agreement** between baseline and planner on benchmark corpus (30/30 PDFs)
+- Eliminated false positives that previously reduced accuracy to ~78%
+
+### Migration
+- **Dataset paths**: Update any scripts using `benchmarkdata/` or `data-source-formats/` to `datasets/`
+- **Ground truth**: `ground_truth_data_source_formats.json` paths updated from `data-source-formats/` to `datasets/`
+
 ## [1.2.1] - 2026-02-09
 
 ### Fixed
@@ -327,7 +360,8 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v2.0.0
 [1.2.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.1
 [1.2.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.0
 [1.1.5]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.1.5
