@@ -5,43 +5,54 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "preocr"
 dynamic = ["version"]
-description = "A fast, CPU-only library that intelligently detects whether files need OCR processing before expensive OCR operations. Uses hybrid adaptive pipeline for 92-95% accuracy."
-readme = "README.md"
+
+description = "A fast, layout-aware OCR decision engine for document processing pipelines. Detects whether files truly require OCR before expensive processing, reducing unnecessary OCR calls while preserving extraction reliability."
+
+readme = { file = "README.md", content-type = "text/markdown" }
+
 requires-python = ">=3.9"
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
+
 authors = [
-    {name = "PreOCR Contributors"}
+    { name = "Yuvaraj Kannan" }
 ]
+
 keywords = [
     "ocr",
-    "document",
-    "detection",
-    "preprocessing",
-    "file-analysis",
-    "layout-analysis",
-    "pdf-analysis",
-    "text-extraction",
+    "ocr-decision",
+    "pre-ocr",
     "document-processing",
-    "opencv",
+    "pdf-analysis",
+    "layout-analysis",
+    "ocr-optimization",
+    "ocr-routing",
+    "pdf-processing",
     "computer-vision",
+    "document-ai",
 ]
+
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
 
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+
+    "License :: OSI Approved :: Apache Software License",
 
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing",
-    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Multimedia :: Graphics :: Capture",
+    "Topic :: Utilities",
 
     "Operating System :: OS Independent",
 ]
-
 
 dependencies = [
     "python-magic>=0.4.27",
@@ -78,14 +89,14 @@ Repository = "https://github.com/yuvaraj3855/preocr"
 Issues = "https://github.com/yuvaraj3855/preocr/issues"
 
 [tool.setuptools]
-packages = {find = {exclude = ["examples*", "scripts*", "tests*", "venv*"]}}
+packages = { find = { exclude = ["examples*", "scripts*", "tests*", "venv*"] } }
 include-package-data = true
 
 [tool.setuptools.package-data]
 preocr = ["py.typed"]
 
 [tool.setuptools.dynamic]
-version = {attr = "preocr.version.__version__"}
+version = { attr = "preocr.version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -112,4 +123,3 @@ warn_redundant_casts = true
 warn_unreachable = true
 strict_optional = true
 no_implicit_optional = true
-
