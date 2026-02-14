@@ -66,20 +66,20 @@ def needs_ocr(
 
     Note on Confidence Scores:
         Confidence scores may vary between page_level=True and page_level=False modes:
-        
+
         - **Without page_level**: Confidence is calculated based on document-level heuristics
           and OpenCV analysis (if triggered). Typical range: 0.60-0.95.
-        
+
         - **With page_level=True**: Confidence is calculated as the average of per-page
           confidence scores, adjusted for consistency. For mixed documents (some pages
           need OCR, some don't), confidence may be lower due to the averaging effect.
           Typical range: 0.60-0.95, but may be lower for mixed documents.
-        
+
         - **Why the difference**: Page-level analysis provides more granular information
           but averages confidence across pages. Document-level analysis uses overall
           text extraction and layout analysis, which can be more confident for uniform
           documents.
-        
+
         Both modes are accurate; the difference reflects the analysis granularity.
         Use page_level=True when you need per-page decisions, otherwise use the
         default (page_level=False) for faster, document-level decisions.
@@ -187,7 +187,7 @@ def needs_ocr(
         if opencv_result:
             # Add OpenCV results to signals BEFORE refining (so hybrid rule can use it)
             collected_signals["opencv_layout"] = opencv_result
-            
+
             # Refine decision based on OpenCV analysis
             needs_ocr_flag, reason, confidence, category, reason_code = decision.refine_with_opencv(
                 collected_signals,
@@ -218,14 +218,14 @@ def needs_ocr(
     if page_analysis and "pages" in page_analysis:
         page_count = page_analysis.get("page_count", 0)
         pages_list = page_analysis.get("pages", [])
-        
+
         # Only add page-level data if it's valid
         if page_count > 0 and len(pages_list) > 0:
             result["pages"] = pages_list
             result["page_count"] = page_count
             result["pages_needing_ocr"] = page_analysis.get("pages_needing_ocr", 0)
             result["pages_with_text"] = page_analysis.get("pages_with_text", 0)
-            
+
             # Override overall decision with page-level analysis only if data is valid
             if page_analysis.get("overall_needs_ocr") is not None:
                 # Validate that page-level analysis is complete and consistent

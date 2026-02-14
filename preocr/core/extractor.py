@@ -134,8 +134,8 @@ def extract_native_data(
 
     # Format output
     return format_result(
-        result, 
-        output_format=output_format, 
+        result,
+        output_format=output_format,
         markdown_clean=markdown_clean,
-        include_metadata=include_metadata
+        include_metadata=include_metadata,
     )

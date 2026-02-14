@@ -46,17 +46,17 @@ def format_as_json(result: ExtractionResult) -> Dict[str, Any]:
 def format_as_markdown(result: ExtractionResult, clean: bool = False) -> str:
     """
     Format result as LLM-ready markdown.
-    
+
     Args:
         result: ExtractionResult to format
         clean: If True, output only content without metadata (file paths, confidence scores, etc.)
                If False, include all metadata (default: False for backward compatibility)
-    
+
     Returns:
         Markdown string
     """
     lines = []
-    
+
     # If clean mode, skip all metadata and just output content
     if clean:
         return _format_as_clean_markdown(result)
@@ -191,14 +191,14 @@ def _format_as_clean_markdown(result: ExtractionResult) -> str:
     Perfect for LLM consumption - just the text content.
     """
     lines = []
-    
+
     # Tables - just the table content
     if result.tables:
         for table in result.tables:
             table_md = _format_table_as_markdown(table)
             lines.append(table_md)
             lines.append("")
-    
+
     # Forms - just field names and values
     if result.forms:
         for form in result.forms:
@@ -207,7 +207,7 @@ def _format_as_clean_markdown(result: ExtractionResult) -> str:
             elif form.value:
                 lines.append(form.value)
             lines.append("")
-    
+
     # Elements (text content) - main content
     if result.elements:
         # Group by page
@@ -217,11 +217,11 @@ def _format_as_clean_markdown(result: ExtractionResult) -> str:
             if page_num not in elements_by_page:
                 elements_by_page[page_num] = []
             elements_by_page[page_num].append(elem)
-        
+
         # Sort pages
         for page_num in sorted(elements_by_page.keys()):
             page_elements = elements_by_page[page_num]
-            
+
             # Sort by reading order if available
             if result.reading_order:
                 page_elements.sort(
@@ -231,7 +231,7 @@ def _format_as_clean_markdown(result: ExtractionResult) -> str:
                         else 9999
                     )
                 )
-            
+
             for elem in page_elements:
                 if elem.element_type == ElementType.TITLE:
                     lines.append(f"# {elem.text}")
@@ -249,7 +249,7 @@ def _format_as_clean_markdown(result: ExtractionResult) -> str:
                 elif elem.text:
                     lines.append(elem.text)
                     lines.append("")
-    
+
     return "\n".join(lines).strip()
 
 
