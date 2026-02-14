@@ -31,20 +31,20 @@ def test_threshold_difference():
         result_strict = needs_ocr(test_file, config=strict_config)
         
         print(f"\nFile has exactly {len(test_content)} characters")
-        print(f"\nDefault threshold (50):")
+        print("\nDefault threshold (50):")
         print(f"  needs_ocr: {result_default['needs_ocr']}")
         print(f"  reason: {result_default['reason']}")
         
-        print(f"\nStrict threshold (51):")
+        print("\nStrict threshold (51):")
         print(f"  needs_ocr: {result_strict['needs_ocr']}")
         print(f"  reason: {result_strict['reason']}")
         
         if result_default['needs_ocr'] != result_strict['needs_ocr']:
-            print(f"\n✓ SUCCESS: Different thresholds produce different results!")
-            print(f"  This proves Config is working correctly.")
+            print("\n✓ SUCCESS: Different thresholds produce different results!")
+            print("  This proves Config is working correctly.")
             return True
         else:
-            print(f"\n⚠ Thresholds didn't change result (file may be detected as text file)")
+            print("\n⚠ Thresholds didn't change result (file may be detected as text file)")
             return True  # Still OK, just means file type detection happened first
         
     except Exception as e:
@@ -71,8 +71,8 @@ def test_office_threshold():
     
     print(f"Default office threshold: {default_config.min_office_text_length}")
     print(f"Strict office threshold: {strict_config.min_office_text_length}")
-    print(f"\n✓ Configs created successfully")
-    print(f"  (Full test requires actual .docx/.pptx/.xlsx files)")
+    print("\n✓ Configs created successfully")
+    print("  (Full test requires actual .docx/.pptx/.xlsx files)")
     
     return True
 

@@ -26,8 +26,6 @@ def test_layout_aware_scanned_pdf_needs_ocr():
     assert result_layout["needs_ocr"] is True, "Layout-aware detection should identify need for OCR"
     
     # Check that layout_aware provides additional information
-    signals = result_layout.get("signals", {})
-    
     # Layout-aware should have attempted analysis
     # (may have opencv_layout or layout_type in signals)
     assert "signals" in result_layout
@@ -56,8 +54,6 @@ def test_layout_aware_digital_pdf_no_ocr():
     assert result_layout["needs_ocr"] is False, "Layout-aware detection should identify no need for OCR"
     
     # Layout-aware should provide layout analysis
-    signals = result_layout.get("signals", {})
-    
     # Should have layout information
     assert "signals" in result_layout
     assert result_layout["category"] == "structured"
@@ -66,7 +62,6 @@ def test_layout_aware_digital_pdf_no_ocr():
 def test_layout_aware_image_file():
     """Test that layout_aware works with image files (always need OCR)."""
     # Create a minimal test image file
-    import tempfile
     
     # For images, we can't easily create a real image file in tests
     # So we'll test the logic with a mock or skip if no image available
