@@ -155,7 +155,8 @@ def test_refine_with_opencv_mixed_content():
         initial_reason_code,
     )
 
-    # Should detect mixed content
+    # With text_length=60, hard digital fires first → NO OCR (correct for extractable text)
     assert isinstance(needs_ocr, bool)
-    assert "mixed" in reason.lower() or "OpenCV" in reason
-    assert confidence >= initial_confidence
+    assert needs_ocr is False
+    assert "hard digital" in reason.lower() or "extractable" in reason.lower()
+    assert confidence >= 0.85

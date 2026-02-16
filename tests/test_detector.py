@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -129,6 +130,40 @@ def test_needs_ocr_layout_aware():
         # layout_aware mainly affects PDFs, but should work for all files
         assert "needs_ocr" in result
         assert "signals" in result
+    finally:
+        Path(temp_path).unlink()
+
+
+def test_hard_digital_early_exit():
+    """Hard Digital Check: PDF with text_length >= 20 exits early, NO OCR, no layout/OpenCV."""
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(b"%PDF-1.4 minimal\n")
+        temp_path = f.name
+
+    try:
+        with patch("preocr.core.detector.filetype_module.detect_file_type") as mock_detect:
+            mock_detect.return_value = {
+                "mime": "application/pdf",
+                "extension": "pdf",
+                "is_binary": True,
+            }
+            with patch("preocr.core.detector.pdf_probe_module.extract_pdf_text") as mock_pdf:
+                mock_pdf.return_value = {
+                    "text_length": 100,
+                    "text": "x" * 100,
+                    "page_count": 1,
+                    "method": "pdfplumber",
+                }
+                with patch(
+                    "preocr.core.detector.layout_analyzer_module.analyze_pdf_layout"
+                ) as mock_layout:
+                    result = detector.needs_ocr(temp_path, layout_aware=True)
+
+                    assert result["needs_ocr"] is False
+                    assert result["reason_code"] == "PDF_DIGITAL"
+                    assert "hard digital" in result["reason"].lower()
+                    # Layout should NOT be called (early exit)
+                    mock_layout.assert_not_called()
     finally:
         Path(temp_path).unlink()
 

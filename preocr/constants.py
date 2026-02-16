@@ -22,6 +22,13 @@ LOW_CONFIDENCE = 0.5
 # If initial confidence is below this, use OpenCV for refinement
 LAYOUT_REFINEMENT_THRESHOLD = 0.9
 
+# Hard Digital Check: extractable text >= this → NO OCR (early exit)
+HARD_DIGITAL_TEXT_THRESHOLD = 20
+
+# Hard Scan Check: image_coverage >= this AND text_length <= hard_scan_text_max → OCR
+HARD_SCAN_IMAGE_COVERAGE_MIN = 80.0
+HARD_SCAN_TEXT_MAX = 20
+
 
 @dataclass
 class Config:
@@ -66,6 +73,10 @@ class Config:
         table_bias_text_coverage_min: With above: require text_coverage >= this. None = disabled.
         ocr_score_image_weight: Weight for image_ratio in OCR score (default 0.35). None = use 0.35.
 
+        hard_digital_text_threshold: Hard Digital Check - if text_length >= this, NO OCR (early exit). Default: 20.
+        hard_scan_image_coverage_min: Hard Scan Check - if image_coverage >= this AND text_length <= hard_scan_text_max, OCR. Default: 80.
+        hard_scan_text_max: Hard Scan Check - max text_length for hard scan. Default: 20.
+
     Example:
         >>> # Use default thresholds
         >>> config = Config()
@@ -95,6 +106,9 @@ class Config:
     table_bias_text_density_min: Optional[float] = 1.5
     table_bias_text_coverage_min: Optional[float] = 40.0
     ocr_score_image_weight: Optional[float] = None
+    hard_digital_text_threshold: int = HARD_DIGITAL_TEXT_THRESHOLD
+    hard_scan_image_coverage_min: float = HARD_SCAN_IMAGE_COVERAGE_MIN
+    hard_scan_text_max: int = HARD_SCAN_TEXT_MAX
 
     def __post_init__(self) -> None:
         """Validate threshold values."""

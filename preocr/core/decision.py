@@ -203,6 +203,16 @@ def decide(
 
     # Rule 4: PDFs (with optional layout-aware analysis)
     if mime == "application/pdf" or extension == "pdf":
+        # 1. Hard Digital Check (defensive fallback - detector may have already exited)
+        if text_length >= config.hard_digital_text_threshold:
+            return (
+                False,
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (hard digital: {text_length} chars extractable)",
+                config.high_confidence,
+                CATEGORY_STRUCTURED,
+                ReasonCode.PDF_DIGITAL,
+            )
+
         # Check if layout analysis is available
         layout_type = signals.get("layout_type")
         is_mixed_content = signals.get("is_mixed_content", False)
@@ -224,6 +234,19 @@ def decide(
         )
         image_ratio = effective_image_coverage / 100.0 if effective_image_coverage > 0 else 0.0
 
+        # 2. Hard Scan Check - image_coverage >= 80% AND text_length < 20 → OCR
+        if (
+            effective_image_coverage >= config.hard_scan_image_coverage_min
+            and text_length < config.hard_scan_text_max
+        ):
+            return (
+                True,
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hard scan: {effective_image_coverage:.1f}% images, {text_length} chars)",
+                config.high_confidence,
+                CATEGORY_UNSTRUCTURED,
+                ReasonCode.PDF_SCANNED,
+            )
+
         # Calculate OCR_SCORE for unified confidence calculation
         ocr_score = None
         if layout_type and layout_type != "unknown":
@@ -231,7 +254,7 @@ def decide(
                 text_length, effective_image_coverage, text_coverage, config
             )
 
-        # Digital bias: high text + moderate image = digital (protects product/manual PDFs)
+        # 3. Digital bias: high text + moderate image = digital (protects product/manual PDFs)
         tc_min = config.digital_bias_text_coverage_min
         ic_max = config.digital_bias_image_coverage_max
         if (
@@ -312,25 +335,6 @@ def decide(
                         confidence,
                         CATEGORY_STRUCTURED,
                         ReasonCode.PDF_DIGITAL,
-                    )
-
-                # Special case: Very high image coverage (>70%) may contain text in images
-                # Even if extractable text exists, background images might need OCR
-                # This handles cases like PrinceCatalogue.pdf with decorative/background images
-                if image_coverage > 70.0 and text_length >= config.min_text_length:
-                    # High image coverage with extractable text = likely background images with text
-                    # Flag as needing OCR for image portions
-                    confidence = calculate_confidence_from_signals(
-                        signals, needs_ocr=True, ocr_score=ocr_score, config=config
-                    )
-                    # Ensure reasonable confidence for this case
-                    confidence = max(confidence, 0.75)
-                    return (
-                        True,
-                        f"{get_reason_description(ReasonCode.PDF_MIXED)} (high image coverage {image_coverage:.1f}% may contain text in images, {text_length} chars extractable)",
-                        confidence,
-                        CATEGORY_UNSTRUCTURED,
-                        ReasonCode.PDF_MIXED,
                     )
 
                 # If text coverage is significant, might not need full OCR
@@ -528,6 +532,29 @@ def refine_with_opencv(
     image_coverage_opencv = opencv_result.get("image_coverage", 0.0)
     has_text_regions = opencv_result.get("has_text_regions", False)
     layout_type = opencv_result.get("layout_type", "unknown")
+
+    # 1. Hard Digital Check (defense-in-depth)
+    if text_length >= config.hard_digital_text_threshold:
+        return (
+            False,
+            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (hard digital: {text_length} chars extractable)",
+            config.high_confidence,
+            CATEGORY_STRUCTURED,
+            ReasonCode.PDF_DIGITAL,
+        )
+
+    # 2. Hard Scan Check
+    if (
+        image_coverage_opencv >= config.hard_scan_image_coverage_min
+        and text_length < config.hard_scan_text_max
+    ):
+        return (
+            True,
+            f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hard scan: {image_coverage_opencv:.1f}% images, {text_length} chars)",
+            config.high_confidence,
+            CATEGORY_UNSTRUCTURED,
+            ReasonCode.PDF_SCANNED,
+        )
 
     # Calculate OCR_SCORE from OpenCV results for unified confidence
     ocr_score_opencv = calculate_ocr_score(

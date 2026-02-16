@@ -96,7 +96,7 @@ def test_unknown_binary_needs_ocr():
 
 
 def test_digital_bias_high_text_moderate_image():
-    """Test digital bias: text_coverage >= 65 and image_coverage <= 50 → no OCR."""
+    """Test hard digital / digital bias: text_length >= 20 → no OCR (or digital bias when layout fits)."""
     from preocr import Config
 
     signals = {
@@ -113,16 +113,16 @@ def test_digital_bias_high_text_moderate_image():
     assert needs is False
     assert category == "structured"
     assert reason_code == "PDF_DIGITAL"
-    assert "digital bias" in reason.lower() or "high text" in reason.lower()
+    assert "hard digital" in reason.lower() or "digital bias" in reason.lower() or "extractable" in reason.lower()
 
 
 def test_hybrid_rule_high_image_low_text():
-    """Test hybrid rule: image_ratio > 0.75 AND text_length < 30 → OCR."""
+    """Test hard scan: image_coverage >= 80% AND text_length < 20 → OCR."""
     signals = {
         "mime": "application/pdf",
         "extension": "pdf",
-        "text_length": 20,  # Low text
-        "image_coverage": 80.0,  # High image coverage (> 75%)
+        "text_length": 10,  # Low text (< 20 for hard scan)
+        "image_coverage": 80.0,  # High image coverage (>= 80%)
         "layout_type": "mixed",
         "is_binary": True,
     }
@@ -130,8 +130,9 @@ def test_hybrid_rule_high_image_low_text():
     needs, reason, confidence, category, reason_code = decision.decide(signals)
     assert needs is True
     assert category == "unstructured"
-    assert "hybrid rule" in reason.lower() or reason_code == "PDF_SCANNED"
-    assert confidence >= 0.9  # High confidence for hybrid rule
+    assert reason_code == "PDF_SCANNED"
+    assert "hard scan" in reason.lower() or "hybrid rule" in reason.lower()
+    assert confidence >= 0.9
 
 
 def test_scoring_model_ocr_detection():
@@ -224,6 +225,60 @@ def test_calculate_confidence_fallback():
         signals2, needs_ocr=True, ocr_score=None
     )
     assert 0.55 <= confidence2 <= 0.75  # Should be in fallback range
+
+
+def test_hard_digital_design_heavy_page():
+    """Digital heavy design page: text_length=100, image_coverage=85% → NO OCR."""
+    signals = {
+        "mime": "application/pdf",
+        "extension": "pdf",
+        "text_length": 100,
+        "image_coverage": 85.0,
+        "layout_type": "mixed",
+        "is_binary": True,
+    }
+
+    needs, reason, confidence, category, reason_code = decision.decide(signals)
+    assert needs is False
+    assert category == "structured"
+    assert reason_code == "PDF_DIGITAL"
+    assert "hard digital" in reason.lower()
+
+
+def test_hard_scan_real_scanned_page():
+    """Real scanned page: text_length=10, image_coverage=85% → OCR."""
+    signals = {
+        "mime": "application/pdf",
+        "extension": "pdf",
+        "text_length": 10,
+        "image_coverage": 85.0,
+        "layout_type": "mixed",
+        "is_binary": True,
+    }
+
+    needs, reason, confidence, category, reason_code = decision.decide(signals)
+    assert needs is True
+    assert category == "unstructured"
+    assert reason_code == "PDF_SCANNED"
+    assert "hard scan" in reason.lower()
+
+
+def test_mixed_page_weighted_model():
+    """Mixed page: text_length=15, image_coverage=50% → weighted model (not hard scan)."""
+    signals = {
+        "mime": "application/pdf",
+        "extension": "pdf",
+        "text_length": 15,
+        "image_coverage": 50.0,
+        "layout_type": "mixed",
+        "is_binary": True,
+    }
+
+    needs, reason, confidence, category, reason_code = decision.decide(signals)
+    # Not hard digital (15 < 20), not hard scan (50 < 80) → weighted model decides
+    assert "hard digital" not in reason.lower()
+    assert "hard scan" not in reason.lower()
+    assert reason_code in ("PDF_SCANNED", "PDF_DIGITAL", "PDF_MIXED")
 
 
 def test_confidence_alignment_with_ocr_score():

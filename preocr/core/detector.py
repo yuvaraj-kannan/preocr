@@ -139,6 +139,33 @@ def needs_ocr(
             progress_callback("extracting_pdf_text", 0.3)
         text_result = pdf_probe_module.extract_pdf_text(str(path), page_level=page_level)
 
+        # 1. Hard Digital Check (early exit) - runs before layout / OpenCV / scoring
+        # If PDF has extractable text >= threshold → NO OCR. Saves compute for design-heavy PDFs.
+        c = config or Config()
+        text_length = text_result.get("text_length", 0)
+        if text_length >= c.hard_digital_text_threshold:
+            if progress_callback:
+                progress_callback("complete", 1.0)
+            minimal_signals = signals.collect_signals(
+                str(path), file_info, text_result, image_result, None
+            )
+            result = {
+                "needs_ocr": False,
+                "file_type": "pdf",
+                "category": constants.CATEGORY_STRUCTURED,
+                "confidence": c.high_confidence,
+                "reason": f"Digital PDF with extractable text ({text_length} chars, hard digital guard)",
+                "reason_code": constants.ReasonCode.PDF_DIGITAL,
+                "signals": minimal_signals,
+            }
+            if page_level and "pages" in text_result:
+                pages = [{**p, "needs_ocr": False} for p in text_result["pages"]]
+                result["pages"] = pages
+                result["page_count"] = text_result.get("page_count", len(pages))
+                result["pages_needing_ocr"] = 0
+                result["pages_with_text"] = sum(1 for p in pages if p.get("has_text", False))
+            return result
+
         # Perform layout analysis if requested
         if layout_aware:
             if progress_callback:
