@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from .. import constants
 from ..core.detector import needs_ocr
+from ..planner import plan_ocr_for_document
+from ..planner.config import PlannerConfig
 from .logger import get_logger
 
 Config = constants.Config
@@ -74,6 +76,52 @@ def _process_single_file(
         return result
     except Exception as e:
         # Return error result instead of raising
+        return {
+            "file_path": file_path,
+            "needs_ocr": None,
+            "error": str(e),
+            "error_type": type(e).__name__,
+        }
+
+
+def _process_single_file_with_planner(
+    file_path: str,
+    planner_config: Optional[PlannerConfig] = None,
+) -> Dict[str, Any]:
+    """
+    Process a single file using the intent-aware planner (used by ProcessPoolExecutor).
+
+    This function must be at module level for pickling in multiprocessing.
+    Uses needs_ocr internally (with layout_aware=True, page_level=True) plus intent scoring.
+
+    Returns:
+        Result dict compatible with BatchResults: needs_ocr, file_path, page_count, etc.
+    """
+    try:
+        plan_result = plan_ocr_for_document(file_path, config=planner_config)
+        needs_ocr_any = plan_result.get("needs_ocr_any", False)
+        pages = plan_result.get("pages", [])
+        pages_needing_ocr = plan_result.get("pages_needing_ocr", [])
+        page_count = len(pages)
+        n_pages_need = len(pages_needing_ocr)
+        ext = Path(file_path).suffix.lower()
+
+        # Map planner output to batch result format
+        return {
+            "file_path": file_path,
+            "needs_ocr": needs_ocr_any,
+            "page_count": page_count,
+            "pages_needing_ocr": n_pages_need,
+            "pages_with_text": page_count - n_pages_need,
+            "file_type": "pdf" if ext == ".pdf" else ext.lstrip(".") or "unknown",
+            "reason": plan_result.get("summary_reason", ""),
+            "confidence": plan_result.get("overall_confidence", 0.5),
+            "reason_code": "PLANNER_INTENT" if needs_ocr_any else "PLANNER_NO_OCR",
+            "planner_metrics": plan_result.get("metrics", {}),
+            "planner_pages": pages,
+            "error": None,
+        }
+    except Exception as e:
         return {
             "file_path": file_path,
             "needs_ocr": None,
@@ -252,6 +300,8 @@ class BatchProcessor:
         max_size: Optional[int] = None,
         recursive: bool = False,
         resume_from: Optional[str] = None,
+        use_planner: bool = False,
+        planner_config: Optional[PlannerConfig] = None,
         # Threshold customization parameters
         min_text_length: Optional[int] = None,
         min_office_text_length: Optional[int] = None,
@@ -275,6 +325,11 @@ class BatchProcessor:
             max_size: Maximum file size in bytes (None = no limit)
             recursive: Scan subdirectories recursively
             resume_from: Path to JSON file with previous results to resume from
+            use_planner: If True, use plan_ocr_for_document (intent-aware planner) instead
+                        of needs_ocr. Planner uses layout_aware=True, page_level=True
+                        and adds intent scoring for medical/OCR-critical content.
+            planner_config: Optional PlannerConfig for intent-aware mode. Only used
+                           when use_planner=True.
             min_text_length: Minimum text length threshold (overrides config if provided)
             min_office_text_length: Minimum office text length threshold (overrides config if provided)
             layout_refinement_threshold: Layout refinement threshold (overrides config if provided)
@@ -295,6 +350,8 @@ class BatchProcessor:
         self.max_size = max_size
         self.recursive = recursive
         self.resume_from = resume_from
+        self.use_planner = use_planner
+        self.planner_config = planner_config or (PlannerConfig() if use_planner else None)
 
         # Handle config: use provided config or create from individual parameters
         if config is None:
@@ -458,19 +515,25 @@ class BatchProcessor:
             results.end_time = time.time()
             return results
 
-        logger.info(f"Processing {len(files)} files with {self.max_workers} workers")
+        mode = "planner (intent-aware)" if self.use_planner else "needs_ocr"
+        logger.info(f"Processing {len(files)} files with {self.max_workers} workers ({mode})")
 
         # Prepare arguments for worker function
-        process_args = [
-            (
-                str(file_path),
-                self.use_cache,
-                self.layout_aware,
-                self.page_level,
-                self.config,
-            )
-            for file_path in files
-        ]
+        if self.use_planner:
+            process_args = [(str(file_path), self.planner_config) for file_path in files]
+            worker_fn = _process_single_file_with_planner
+        else:
+            process_args = [
+                (
+                    str(file_path),
+                    self.use_cache,
+                    self.layout_aware,
+                    self.page_level,
+                    self.config,
+                )
+                for file_path in files
+            ]
+            worker_fn = _process_single_file
 
         # Process files
         if progress and TQDM_AVAILABLE:
@@ -486,8 +549,7 @@ class BatchProcessor:
                 with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
                     # Submit all tasks
                     future_to_file = {
-                        executor.submit(_process_single_file, *args): args[0]
-                        for args in process_args
+                        executor.submit(worker_fn, *args): args[0] for args in process_args
                     }
 
                     # Process completed tasks
@@ -536,7 +598,7 @@ class BatchProcessor:
 
             with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_file = {
-                    executor.submit(_process_single_file, *args): args[0] for args in process_args
+                    executor.submit(worker_fn, *args): args[0] for args in process_args
                 }
 
                 for future in as_completed(future_to_file):
