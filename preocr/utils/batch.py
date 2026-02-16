@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from .. import constants
 from ..core.detector import needs_ocr
@@ -519,6 +519,8 @@ class BatchProcessor:
         logger.info(f"Processing {len(files)} files with {self.max_workers} workers ({mode})")
 
         # Prepare arguments for worker function
+        process_args: List[Tuple[Any, ...]]
+        worker_fn: Callable[..., Dict[str, Any]]
         if self.use_planner:
             process_args = [(str(file_path), self.planner_config) for file_path in files]
             worker_fn = _process_single_file_with_planner
