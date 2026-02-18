@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-18
+
 ### Added
 - **Signal/Decision/Hints Separation**: `needs_ocr` now returns structured output for easier debugging:
   - `signals`: Raw detection signals (text_length, image_coverage, font_count, non_printable_ratio, etc.)
@@ -397,7 +399,8 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.6.0
 [1.5.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.5.0
 [1.4.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.4.0
 [1.3.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.3.1
