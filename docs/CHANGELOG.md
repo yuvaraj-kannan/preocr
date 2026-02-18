@@ -7,38 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-02-14
+## [1.6.0] - 2026-02-18
 
 ### Added
-- **OpenCV Skip Heuristics**: Configurable options to skip OpenCV refinement for clearly digital documents, improving performance on large PDFs:
-  - `skip_opencv_if_file_size_mb`: Skip when file exceeds size threshold
-  - `skip_opencv_if_page_count`: Skip when page count exceeds threshold
-  - `skip_opencv_text_coverage_min`, `skip_opencv_confidence_min`, `skip_opencv_max_image_coverage` for fine-grained control
-- **Digital Bias Rules**: New config options (`digital_bias_text_coverage_min`, `digital_bias_image_coverage_max`) to force `needs_ocr=False` for high-text, low-image PDFs that were previously misclassified
-- **Table Bias Rules**: Config options (`table_bias_text_density_min`, `table_bias_text_coverage_min`) for mixed-layout documents with dense text (e.g., tables) to reduce false positives
-- **Page Count in Signals**: PDF analysis now includes `page_count` in collected signals for heuristics and skip logic
-- **Unified Datasets Folder**: Consolidated `benchmarkdata` and `data-source-formats` into a single `datasets/` directory—all test and benchmark documents in one flat folder
+- **Signal/Decision/Hints Separation**: `needs_ocr` now returns structured output for easier debugging:
+  - `signals`: Raw detection signals (text_length, image_coverage, font_count, non_printable_ratio, etc.)
+  - `decision`: Structured decision (needs_ocr, confidence, reason_code, reason)
+  - `hints`: Downstream suggestions (suggested_engine, suggest_preprocessing, ocr_complexity_score)
+- **Hard Scan Shortcut Font Guard**: Hard scan shortcut now requires `font_count == 0` to avoid false positives on digital PDFs with background raster images
+- **Digital-but-Low-Quality Detection**: New text quality signals (`non_printable_ratio`, `unicode_noise_ratio`, `avg_word_length`) to detect broken/invisible text layers—treats as scan when noise exceeds thresholds
+- **Feature-Driven Engine Suggestion**: `ocr_complexity_score` now drives engine selection: &lt; 0.3 → Tesseract, 0.3–0.7 → PaddleOCR, &gt; 0.7 → Vision LLM
+- **`intent_refinement` Alias**: `plan_ocr_for_document` can now be imported as `intent_refinement` for clearer mental model
+- **Benchmark Script**: `scripts/benchmark_batch_full.py` with full dataset support, per-file timeout, auto workers, PDF-wise log (`-v`), and diagram generation
 
 ### Changed
-- **Dataset Structure**: `benchmarkdata/` and `data-source-formats/` moved into `datasets/`; all documents stored directly with no subfolders
-- **Decision Logic**: Document-level digital and table guards prevent single low-text pages from incorrectly flipping entire document to `needs_ocr=True`
-- **Planner Image Weight**: Lower image weight (0.2) in generic mode for better agreement with core detector
-- **Pydantic Models**: `ExtractionResult` migrated from deprecated `class Config` to `model_config = ConfigDict()` for Pydantic v2 compatibility
-- **Codebase Cleanup**: Full Ruff and Black formatting, removed unused imports, fixed f-string and test return-value warnings
+- **Confidence Band Refined**: Updated thresholds for mid-confidence docs:
+  - `≥ 0.90`: Immediate exit (skip OpenCV)
+  - `0.75–0.90`: Skip OpenCV unless image-heavy
+  - `0.50–0.75`: Light refinement (2–3 pages)
+  - &lt; 0.50: Full refinement
+- **Variance-Based Escalation**: Page-level analysis now uses explicit `std(page_scores) > 0.18` threshold (configurable via `variance_page_escalation_std`)
+- **Configurable Image-Heavy Guard**: New `skip_opencv_image_guard` (default 50%) in 0.75–0.90 band—tunable per domain (e.g. financial vs product PDFs)
+- **Warning Suppression**: Extended `suppress_pdf_warnings()` to filter "Cannot set non-stroke color" messages from pdfplumber
+
+### Deprecated
+- `confidence_image_heavy_threshold` in Config—use `skip_opencv_image_guard` instead (backward compatible via getattr fallback)
+
+## [1.5.0] - 2026-02-16
+
+### Added
+- **Hard Digital and Hard Scan Checks**: Early-exit heuristics for improved OCR decision-making:
+  - Hard digital: extractable text ≥ threshold → NO OCR (skip layout/OpenCV)
+  - Hard scan: image coverage > 85%, text < 10 chars → direct OCR decision
+
+## [1.4.0] - 2026-02-16
+
+### Added
+- **Batch Process**: Intent-aware processing for single files in batch
+- **BatchProcessor**: Enhanced type hints and batch processing improvements
+
+## [1.3.1] - 2026-02-14
+
+### Changed
+- Updated project metadata in pyproject.toml
+
+## [1.3.0] - 2026-02-14
+
+### Added
+- **Intent-Aware Planner**: New `plan_ocr_for_document` for domain-specific OCR decisions
+- **OpenCV Skip Heuristics**: Configurable options to skip OpenCV refinement for clearly digital documents
+- **Digital Bias Rules**: Config options to force `needs_ocr=False` for high-text, low-image PDFs
+- **Table Bias Rules**: Config options for mixed-layout documents with dense text
+- **Unified Datasets Folder**: Consolidated `benchmarkdata` and `data-source-formats` into `datasets/`
+
+### Changed
+- **Dataset Structure**: Moved into `datasets/`; documents stored directly with no subfolders
+- **Decision Logic**: Document-level digital and table guards prevent single low-text pages from flipping entire document
+- **Planner Image Weight**: Lower image weight (0.2) in generic mode
+- **Pydantic Models**: `ExtractionResult` migrated to `model_config = ConfigDict()` for Pydantic v2
 
 ### Fixed
-- **False Positives on Digital PDFs**: Fixed misclassification of digital PDFs (e.g., product manuals, marketing PDFs) that were incorrectly flagged as `needs_ocr=True`—now correctly identified as `needs_ocr=False`
-- **Page-Level Override**: Single low-text pages no longer override document-level digital signals when `digital_guard` or `table_guard` applies
-- **Test Warnings**: Resolved pytest return-not-None warnings in `test_config_thresholds.py`
-
-### Accuracy
-- **100% accuracy** on data-source-formats benchmark (10/10 PDFs correct)
-- **100% agreement** between baseline and planner on benchmark corpus (30/30 PDFs)
-- Eliminated false positives that previously reduced accuracy to ~78%
+- False positives on digital PDFs (product manuals, marketing PDFs)
+- Page-level override when digital_guard or table_guard applies
 
 ### Migration
-- **Dataset paths**: Update any scripts using `benchmarkdata/` or `data-source-formats/` to `datasets/`
-- **Ground truth**: `ground_truth_data_source_formats.json` paths updated from `data-source-formats/` to `datasets/`
+- Dataset paths: `benchmarkdata/` and `data-source-formats/` → `datasets/`
+
+## [1.2.2] - 2026-02-14
+
+### Changed
+- Code cleanup: improved formatting, whitespace, and readability
+- Removed outdated documentation, updated .gitignore
 
 ## [1.2.1] - 2026-02-09
 
@@ -360,8 +399,13 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v2.0.0
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.6.0
+[1.5.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.5.0
+[1.4.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.4.0
+[1.3.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.3.1
+[1.3.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.3.0
+[1.2.2]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.2
 [1.2.1]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.1
 [1.2.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.2.0
 [1.1.5]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.1.5

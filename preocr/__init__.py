@@ -2,7 +2,7 @@
 
 from .core.detector import needs_ocr
 from .core.extractor import extract_native_data
-from .planner import plan_ocr_for_document
+from .planner import intent_refinement, plan_ocr_for_document
 from .utils.batch import BatchProcessor, BatchResults
 from .version import __version__
 
@@ -22,6 +22,7 @@ __all__ = [
     "needs_ocr",
     "extract_native_data",
     "plan_ocr_for_document",
+    "intent_refinement",
     "__version__",
     "BatchProcessor",
     "BatchResults",

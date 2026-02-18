@@ -127,15 +127,19 @@ results.print_summary()
 ### OCR Detection (`needs_ocr`)
 
 - **Universal File Support**: PDFs, Office docs (DOCX, PPTX, XLSX), images, text files
+- **Early Exits**: Hard digital guard (high text → NO OCR) and hard scan shortcut (image-heavy + font_count=0 → OCR) skip layout/OpenCV
+- **Signal/Decision/Hints Separation**: Raw signals, structured decision, and downstream hints (suggested_engine, preprocessing) for debugging and routing
 - **Layout-Aware Analysis**: Detects mixed content and layout structure
-- **Page-Level Granularity**: Analyze PDFs page-by-page for precise detection
-- **Confidence Scores**: Per-decision confidence with reason codes
-- **Hybrid Pipeline**: Fast heuristics + OpenCV refinement for edge cases
-- **OpenCV Skip Heuristics**: Skips OpenCV for clearly digital documents (file size, page count, text coverage) to improve performance
+- **Page-Level Granularity**: Analyze PDFs page-by-page; variance-based escalation skips full analysis for uniform docs
+- **Confidence Band**: Tiered OpenCV refinement (≥0.90 exit, 0.75–0.90 skip unless image-heavy, 0.50–0.75 light, <0.50 full)
+- **Configurable Image Guard**: `skip_opencv_image_guard` (default 50%) tunable per domain
+- **Digital-but-Low-Quality Detection**: Text quality signals (non_printable_ratio, unicode_noise_ratio) catch broken text layers
+- **Feature-Driven Engine Suggestion**: `ocr_complexity_score` drives Tesseract/Paddle/Vision LLM selection when OCR needed
 - **Digital/Table Bias**: Reduces false positives on high-text PDFs (product manuals, marketing docs) via configurable rules
 
-### Intent-Aware OCR Planner (`plan_ocr_for_document`)
+### Intent-Aware OCR Planner (`plan_ocr_for_document` / `intent_refinement`)
 
+- **Alias**: `intent_refinement` — refines needs_ocr with domain-specific scoring
 - **Medical Domain**: Terminal overrides for prescriptions, diagnosis, discharge summaries, lab reports
 - **Weighted Scoring**: Configurable threshold with safety/balanced/cost modes
 - **Explainability**: Per-page score breakdown (intent, image_dominance, text_weakness)
@@ -207,16 +211,29 @@ print(f"Confidence: {result['confidence']:.2f}")
 print(f"Reason: {result['reason']}")
 ```
 
+#### Structured Result (Signals, Decision, Hints)
+
+```python
+result = needs_ocr("document.pdf", layout_aware=True)
+
+# Debug misclassifications via raw signals
+print(result["signals"])   # text_length, image_coverage, font_count, etc.
+print(result["decision"])  # needs_ocr, confidence, reason_code
+print(result["hints"])     # suggested_engine, suggest_preprocessing (when needs_ocr=True)
+```
+
 #### Intent-Aware Planner (Medical/Domain-Specific)
 
 ```python
-from preocr import plan_ocr_for_document
+from preocr import plan_ocr_for_document  # or intent_refinement
 
 result = plan_ocr_for_document("hospital_discharge.pdf")
 print(f"Needs OCR (any page): {result['needs_ocr_any']}")
+print(f"Summary: {result['summary_reason']}")
 for page in result["pages"]:
+    score = page.get("debug", {}).get("score", 0)
     print(f"  Page {page['page_number']}: needs_ocr={page['needs_ocr']} "
-          f"type={page['decision_type']} score={page['debug']['score']:.2f}")
+          f"type={page['decision_type']} score={score:.2f}")
 ```
 
 #### Layout-Aware Detection
@@ -319,16 +336,16 @@ print(f"Needs OCR: {stats['needs_ocr']} ({stats['needs_ocr']/stats['processed']*
 from preocr import needs_ocr, extract_native_data
 
 def process_document(file_path):
-    # Check if OCR is needed
-    ocr_check = needs_ocr(file_path)
-    
+    ocr_check = needs_ocr(file_path, layout_aware=True)
+
     if ocr_check["needs_ocr"]:
-        # Run expensive OCR
-        # from mineru import ocr
-        # ocr_result = ocr(file_path)
-        return {"source": "ocr", "text": "..."}
+        # Use hints for engine selection and preprocessing
+        hints = ocr_check["hints"]
+        engine = hints.get("suggested_engine", "tesseract")  # tesseract | paddle | vision_llm
+        preprocess = hints.get("suggest_preprocessing", [])  # e.g. ["deskew", "otsu"]
+        # Run OCR with chosen engine
+        return {"source": "ocr", "engine": engine, "text": "..."}
     else:
-        # Extract native text
         result = extract_native_data(file_path)
         return {"source": "native", "text": result.text}
 ```
@@ -369,12 +386,26 @@ result = needs_ocr("document.pdf", config=config)
 
 ### Available Thresholds
 
+**Core:**
 - `min_text_length`: Minimum text length (default: 50)
 - `min_office_text_length`: Minimum office text length (default: 100)
 - `layout_refinement_threshold`: OpenCV trigger threshold (default: 0.9)
+
+**Confidence Band:**
+- `confidence_exit_threshold`: Skip OpenCV when confidence ≥ this (default: 0.90)
+- `confidence_light_refinement_min`: Light refinement when confidence in [this, exit) (default: 0.50)
+- `skip_opencv_image_guard`: In 0.75–0.90 band, run OpenCV only if image_coverage > this % (default: 50)
+
+**Page-Level:**
+- `variance_page_escalation_std`: Run full page-level when std(page_scores) > this (default: 0.18)
+
+**Skip Heuristics:**
 - `skip_opencv_if_file_size_mb`: Skip OpenCV when file size ≥ N MB (default: None)
 - `skip_opencv_if_page_count`: Skip OpenCV when page count ≥ N (default: None)
-- `digital_bias_text_coverage_min`: Force no-OCR when text_coverage ≥ this and image_coverage is low (default: 65)
+- `skip_opencv_max_image_coverage`: Never skip when image_coverage > this (default: None)
+
+**Bias Rules:**
+- `digital_bias_text_coverage_min`: Force no-OCR when text_coverage ≥ this and image_coverage low (default: 65)
 - `table_bias_text_density_min`: For mixed layout, treat as digital when text_density ≥ this (default: 1.5)
 
 ---
@@ -418,6 +449,13 @@ if result["reason_code"] == "PDF_MIXED":
 
 *Typical: most PDFs finish in under 1 second. Heuristics-only files: 120–180ms avg. Large or mixed documents may take 1–3s with OpenCV.*
 
+### Full Dataset Batch Benchmark
+
+<p align="center">
+  <img src="scripts/benchmark_diagram.png" alt="PreOCR Batch Benchmark - Full Dataset" width="700">
+  <br><em>PreOCR Batch Benchmark: 192 PDFs, 1.5 files/sec, median 1134ms</em>
+</p>
+
 ### Benchmark Results (≤1MB Dataset)
 
 <p align="center">
@@ -453,26 +491,95 @@ if result["reason_code"] == "PDF_MIXED":
 
 ## 🏗️ How It Works
 
-PreOCR uses a **hybrid adaptive pipeline**:
+PreOCR uses a **hybrid adaptive pipeline** with early exits, confidence bands, and optional OpenCV refinement.
+
+### Pipeline Flow
 
 ```
 File Input
     ↓
-File Type Detection
+File Type Detection (mime, extension)
     ↓
-Text Extraction Probe
+Text Extraction (PDF/Office/Text/Image probe)
     ↓
-Decision Engine (Rule-based)
+┌─────────────────────────────────────────────────────────────────┐
+│ PDF Early Exits (before layout/OpenCV)                           │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Hard Digital Guard: text_length ≥ threshold → NO OCR, return  │
+│ 2. Hard Scan Shortcut: image>85%, text<10, font_count==0 → OCR   │
+└─────────────────────────────────────────────────────────────────┘
+    ↓ (if no early exit)
+Layout Analysis (optional, if layout_aware=True)
     ↓
-Confidence Check
-    ├─ High (≥0.9) → Return Fast
-    └─ Low (<0.9) → OpenCV Analysis → Refine → Return
+Collect Signals (text_length, image_coverage, font_count, text quality, etc.)
+    ↓
+Decision Engine (rule-based heuristics + OCR_SCORE)
+    ↓
+Confidence Band → OpenCV Refinement (PDFs only)
+    ├─ ≥ 0.90: Immediate exit (skip OpenCV)
+    ├─ 0.75–0.90: Skip OpenCV unless image_coverage > skip_opencv_image_guard (default 50%)
+    ├─ 0.50–0.75: Light refinement (sample 2–3 pages)
+    └─ < 0.50: Full OpenCV refinement
+    ↓
+Return Result (signals, decision, hints)
 ```
 
-**Pipeline Performance:**
-- **~85-90% of files**: Fast path (< 150ms) - heuristics only
-- **~10-15% of files**: Refined path (150-300ms) - heuristics + OpenCV
-- **Overall accuracy**: 92-95% with hybrid pipeline
+### Early Exits (Speed)
+
+| Exit | Condition | Action |
+|------|-----------|--------|
+| **Hard Digital** | `text_length ≥ hard_digital_text_threshold` | NO OCR, return immediately |
+| **Hard Scan** | `image_coverage > 85%`, `text_length < 10`, `font_count == 0` | Needs OCR, skip layout/OpenCV |
+
+The `font_count == 0` guard prevents digital PDFs with background raster images from being misclassified as scans.
+
+### Confidence Band (OpenCV Tiers)
+
+| Confidence | Action |
+|------------|--------|
+| **≥ 0.90** | Skip OpenCV entirely |
+| **0.75–0.90** | Skip OpenCV unless `image_coverage > skip_opencv_image_guard` (default 50%) |
+| **0.50–0.75** | Light refinement (2–3 pages sampled) |
+| **< 0.50** | Full OpenCV refinement |
+
+### Variance-Based Page Escalation
+
+When `page_level=True`, full page-level analysis runs only when `std(page_scores) > 0.18`. For uniform documents (all digital or all scanned), doc-level decision is reused for all pages—faster for large PDFs.
+
+### Digital-but-Low-Quality Detection
+
+PDFs with a text layer but broken/invisible text (garbage) are detected via:
+- `non_printable_ratio` > 5%
+- `unicode_noise_ratio` > 8%
+
+Such files are treated as needing OCR to avoid false negatives.
+
+### Result Structure (v1.6.0+)
+
+```python
+result = needs_ocr("document.pdf", layout_aware=True)
+
+# Flat keys (backward compatible)
+result["needs_ocr"]      # True/False
+result["confidence"]     # 0.0–1.0
+result["reason_code"]    # e.g. "PDF_DIGITAL", "PDF_SCANNED"
+
+# Structured (for debugging)
+result["signals"]        # Raw: text_length, image_coverage, font_count, non_printable_ratio, etc.
+result["decision"]       # {needs_ocr, confidence, reason_code, reason}
+result["hints"]          # {suggested_engine, suggest_preprocessing, ocr_complexity_score}
+```
+
+When `needs_ocr=True`, `hints` provides:
+- **suggested_engine**: `tesseract` (< 0.3) | `paddle` (0.3–0.7) | `vision_llm` (> 0.7)
+- **suggest_preprocessing**: e.g. `["deskew", "otsu", "denoise"]`
+- **ocr_complexity_score**: 0.0–1.0, drives engine selection
+
+### Pipeline Performance
+
+- **~85–90% of files**: Fast path (< 150ms) — heuristics only, often early exit
+- **~10–15% of files**: Refined path (150–300ms) — heuristics + OpenCV
+- **Overall accuracy**: 92–95% with hybrid pipeline
 
 ---
 
@@ -489,7 +596,12 @@ Determine if a file needs OCR processing.
 - `config` (Config): Custom configuration (default: None)
 
 **Returns:**
-Dictionary with `needs_ocr`, `confidence`, `reason_code`, `reason`, `signals`, and optional `pages`/`layout`.
+Dictionary with:
+- **Flat**: `needs_ocr`, `confidence`, `reason_code`, `reason`, `file_type`, `category`
+- **signals**: Raw detection signals (text_length, image_coverage, font_count, non_printable_ratio, etc.)
+- **decision**: Structured `{needs_ocr, confidence, reason_code, reason}`
+- **hints**: `{suggested_engine, suggest_preprocessing, ocr_complexity_score}` when needs_ocr=True
+- **pages** / **layout**: Optional, when page_level or layout_aware
 
 ### `extract_native_data(file_path, include_tables=True, include_forms=True, include_metadata=True, include_structure=True, include_images=True, include_bbox=True, pages=None, output_format="pydantic", config=None)`
 
@@ -617,6 +729,7 @@ pytest
 
 # Run benchmarks (add PDFs to datasets/ for testing)
 python scripts/benchmark_accuracy.py datasets -g scripts/ground_truth_data_source_formats.json --layout-aware --page-level
+python scripts/benchmark_batch_full.py datasets -v  # Full dataset, PDF-wise log, diagram
 python scripts/benchmark_planner.py datasets
 
 # Run linting
@@ -632,12 +745,15 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
 
 ### Recent Updates
 
-**v2.0.0** - Accuracy & Performance (Latest)
-- ✅ **100% Accuracy**: Fixed false positives on digital PDFs; benchmark validation at 100%
-- ✅ **OpenCV Skip Heuristics**: Skip OpenCV for clearly digital documents (configurable by file size, page count)
-- ✅ **Digital/Table Bias Rules**: New config options to reduce false positives on product manuals, marketing PDFs
-- ✅ **Unified Datasets**: Consolidated `benchmarkdata` and `data-source-formats` into `datasets/` directory
-- ✅ **Page Count in Signals**: PDF analysis includes page count for smarter heuristics
+**v1.6.0** - Signal/Decision Separation & Confidence Band (Latest)
+- ✅ **Signal/Decision/Hints Separation**: Structured output for debugging and downstream routing
+- ✅ **Hard Scan Font Guard**: `font_count == 0` required for hard scan shortcut (avoids false positives on digital PDFs with background images)
+- ✅ **Refined Confidence Band**: ≥0.90 exit, 0.75–0.90 skip unless image-heavy, 0.50–0.75 light, <0.50 full
+- ✅ **skip_opencv_image_guard**: Configurable (default 50%) for domain-specific tuning
+- ✅ **Variance-Based Escalation**: Full page-level only when std(page_scores) > 0.18
+- ✅ **Digital-but-Low-Quality Detection**: Text quality signals catch broken/invisible text layers
+- ✅ **Feature-Driven Engine Suggestion**: ocr_complexity_score → Tesseract/Paddle/Vision LLM
+- ✅ **intent_refinement** alias for plan_ocr_for_document
 
 **v1.1.0** - Invoice Intelligence & Advanced Extraction
 - ✅ Semantic deduplication, invoice intelligence, text merging

@@ -29,7 +29,11 @@ except ImportError:
     fitz = None
 
 
-def analyze_with_opencv(file_path: str, page_level: bool = False) -> Optional[Dict[str, Any]]:
+def analyze_with_opencv(
+    file_path: str,
+    page_level: bool = False,
+    max_pages_to_analyze: Optional[int] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Analyze PDF layout using OpenCV for text/image region detection.
 
@@ -39,6 +43,8 @@ def analyze_with_opencv(file_path: str, page_level: bool = False) -> Optional[Di
     Args:
         file_path: Path to the PDF file
         page_level: If True, analyze all pages and return per-page results
+        max_pages_to_analyze: Cap on pages to analyze (e.g. 2 for light refinement).
+            None = use default sampling (5 for small docs, 5 sampled for large).
 
     Returns:
         Dictionary with layout analysis results:
@@ -78,6 +84,8 @@ def analyze_with_opencv(file_path: str, page_level: bool = False) -> Optional[Di
                 additional = min(2, total_pages - 3)
                 other_pages = [i for i in range(1, total_pages - 1) if i != total_pages // 2]
                 pages_to_analyze.extend(random.sample(other_pages, additional))
+        if max_pages_to_analyze is not None and max_pages_to_analyze > 0:
+            pages_to_analyze = pages_to_analyze[: max_pages_to_analyze]
 
         overall_text_area = 0.0
         overall_image_area = 0.0

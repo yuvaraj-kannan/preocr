@@ -35,6 +35,8 @@ class PlannerConfig:
         very_low_text_threshold: Text length below this may add failsafe_boost.
         fast_path_image_coverage_threshold: Skip planner scoring when preocr says no
             OCR and all pages have image_coverage below this (%). 0 = disabled.
+        confidence_exit_threshold: If fast-path needs_ocr returns confidence >= this,
+            skip full planner (layout_aware, page_level, intent). 0 = disabled.
         decision_version: Version string for decision schema.
     """
 
@@ -51,6 +53,7 @@ class PlannerConfig:
     text_weakness_weight: float = 0.3
     very_low_text_threshold: int = 20
     fast_path_image_coverage_threshold: float = 10.0  # 0 = disabled
+    confidence_exit_threshold: float = 0.85  # 0 = disabled
     decision_version: str = "intent-aware-v1"
 
     def get_decision_threshold(self) -> float:

@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from .. import constants
 from ..analysis import layout_analyzer, opencv_layout, page_detection
 from ..probes import image_probe, office_probe, pdf_probe, text_probe
-from ..utils import cache, filetype, logger as logger_module
+from ..utils import cache, filetype, logger as logger_module, telemetry
 from . import decision, signals
 
 Config = constants.Config
@@ -35,6 +35,7 @@ def needs_ocr(
     use_cache: bool = False,
     progress_callback: Optional[Callable[[str, float], None]] = None,
     config: Optional[Config] = None,
+    telemetry_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     """
     Determine if a file needs OCR processing.
@@ -51,6 +52,8 @@ def needs_ocr(
         progress_callback: Optional callback function(current_stage, progress) called
                           during processing. progress is 0.0-1.0.
         config: Optional Config object with threshold settings. If None, uses default thresholds.
+        telemetry_callback: Optional callback(event, data) for structured telemetry events.
+            Also enable PREOCR_TELEMETRY=1 for default JSON logging.
 
     Returns:
         Dictionary with keys:
@@ -132,32 +135,40 @@ def needs_ocr(
     image_result = None
     page_analysis = None
     layout_result = None
+    skip_page_analysis_for_variance = False
+    font_count: Optional[int] = None
 
     if mime == "application/pdf":
         # PDF text extraction (with optional page-level analysis)
         if progress_callback:
             progress_callback("extracting_pdf_text", 0.3)
         text_result = pdf_probe_module.extract_pdf_text(str(path), page_level=page_level)
+        font_count = layout_analyzer_module.get_pdf_font_count(str(path))
 
         # 1. Hard Digital Check (early exit) - runs before layout / OpenCV / scoring
         # If PDF has extractable text >= threshold → NO OCR. Saves compute for design-heavy PDFs.
         c = config or Config()
         text_length = text_result.get("text_length", 0)
         if text_length >= c.hard_digital_text_threshold:
+            telemetry.emit_with_callback(
+                telemetry_callback,
+                "digital_guard_exit",
+                {"text_length": text_length, "needs_ocr": False},
+            )
             if progress_callback:
                 progress_callback("complete", 1.0)
             minimal_signals = signals.collect_signals(
                 str(path), file_info, text_result, image_result, None
             )
-            result = {
-                "needs_ocr": False,
-                "file_type": "pdf",
-                "category": constants.CATEGORY_STRUCTURED,
-                "confidence": c.high_confidence,
-                "reason": f"Digital PDF with extractable text ({text_length} chars, hard digital guard)",
-                "reason_code": constants.ReasonCode.PDF_DIGITAL,
-                "signals": minimal_signals,
-            }
+            result = _build_result(
+                needs_ocr=False,
+                file_type_category="pdf",
+                category=constants.CATEGORY_STRUCTURED,
+                confidence=c.high_confidence,
+                reason=f"Digital PDF with extractable text ({text_length} chars, hard digital guard)",
+                reason_code=constants.ReasonCode.PDF_DIGITAL,
+                signals=minimal_signals,
+            )
             if page_level and "pages" in text_result:
                 pages = [{**p, "needs_ocr": False} for p in text_result["pages"]]
                 result["pages"] = pages
@@ -165,6 +176,45 @@ def needs_ocr(
                 result["pages_needing_ocr"] = 0
                 result["pages_with_text"] = sum(1 for p in pages if p.get("has_text", False))
             return result
+
+        # 2. Hard Scan Shortcut - obvious scans: image>85%, text<10, font_count==0 → direct OCR
+        # font_count==0 guards against digital PDFs with background raster images
+        if text_length < getattr(constants, "HARD_SCAN_SHORTCUT_TEXT_MAX", 10):
+            quick_img = layout_analyzer_module.get_quick_image_coverage(str(path))
+            font_ok = font_count is None or font_count == 0
+            if (
+                font_ok
+                and quick_img is not None
+                and quick_img >= getattr(constants, "HARD_SCAN_SHORTCUT_IMAGE_MIN", 85.0)
+            ):
+                telemetry.emit_with_callback(
+                    telemetry_callback,
+                    "hard_scan_shortcut",
+                    {"image_coverage": quick_img, "text_length": text_length},
+                )
+                if progress_callback:
+                    progress_callback("complete", 1.0)
+                minimal_signals = signals.collect_signals(
+                    str(path), file_info, text_result, image_result, None
+                )
+                minimal_signals["image_coverage"] = quick_img
+                minimal_signals["font_count"] = font_count
+                result = _build_result(
+                    needs_ocr=True,
+                    file_type_category="pdf",
+                    category=constants.CATEGORY_UNSTRUCTURED,
+                    confidence=0.95,
+                    reason=f"Hard scan shortcut: {quick_img:.1f}% images, {text_length} chars",
+                    reason_code=constants.ReasonCode.PDF_SCANNED,
+                    signals=minimal_signals,
+                )
+                if page_level and "pages" in text_result:
+                    pages = [{**p, "needs_ocr": True} for p in text_result["pages"]]
+                    result["pages"] = pages
+                    result["page_count"] = text_result.get("page_count", len(pages))
+                    result["pages_needing_ocr"] = len(pages)
+                    result["pages_with_text"] = 0
+                return result
 
         # Perform layout analysis if requested
         if layout_aware:
@@ -174,13 +224,29 @@ def needs_ocr(
                 str(path), page_level=page_level
             )
 
-        # Perform page-level analysis if requested
+        # Perform page-level analysis if requested (with variance-based escalation)
+        # Only run full page-level when std(page_scores) > threshold (pages differ)
         if page_level and "pages" in text_result:
-            if progress_callback:
-                progress_callback("analyzing_pages", 0.6)
-            page_analysis = page_detection_module.analyze_pdf_pages(
-                str(path), file_info, text_result
-            )
+            c = config or Config()
+            pages_data = text_result.get("pages", [])
+            std_threshold = getattr(c, "variance_page_escalation_std", 0.18)
+            if std_threshold > 0 and len(pages_data) >= 3:
+                scores = [
+                    1.0 if p.get("text_length", 0) < constants.MIN_TEXT_LENGTH else 0.0
+                    for p in pages_data
+                ]
+                if len(scores) >= 2:
+                    mean_s = sum(scores) / len(scores)
+                    var_s = sum((x - mean_s) ** 2 for x in scores) / len(scores)
+                    std_s = (var_s ** 0.5) if var_s > 0 else 0.0
+                    if std_s <= std_threshold:
+                        skip_page_analysis_for_variance = True
+            if not skip_page_analysis_for_variance:
+                if progress_callback:
+                    progress_callback("analyzing_pages", 0.6)
+                page_analysis = page_detection_module.analyze_pdf_pages(
+                    str(path), file_info, text_result
+                )
     elif "officedocument" in mime or extension in ["docx", "pptx", "xlsx"]:
         # Office document text extraction
         text_result = office_probe_module.extract_office_text(str(path), mime)
@@ -191,9 +257,11 @@ def needs_ocr(
         # Image analysis (no text extraction)
         image_result = image_probe_module.analyze_image(str(path))
 
-    # Step 3: Collect all signals
+    # Step 3: Collect all signals (font_count already set for PDFs in block above)
+    if mime != "application/pdf":
+        font_count = None  # Only PDFs have font_count
     collected_signals = signals.collect_signals(
-        str(path), file_info, text_result, image_result, layout_result
+        str(path), file_info, text_result, image_result, layout_result, font_count=font_count
     )
 
     # Step 4: Make initial decision (heuristics)
@@ -205,9 +273,35 @@ def needs_ocr(
         collected_signals, config=config
     )
 
-    # Step 5: Confidence check → OpenCV layout refinement (if needed)
-    # If confidence is low OR layout_aware is True, use OpenCV to refine the decision
+    # Step 5: Confidence band → OpenCV layout refinement (if needed)
+    # >= 0.90: immediate exit | 0.75-0.90: skip unless image-heavy | 0.50-0.75: light (2-3 pg) | < 0.50: full
+    c = config or Config()
+    conf_exit = getattr(c, "confidence_exit_threshold", 0.90)
+    conf_light = getattr(c, "confidence_light_refinement_min", 0.50)
+    skip_image_guard = getattr(c, "skip_opencv_image_guard", None) or getattr(
+        c, "confidence_image_heavy_threshold", 50.0
+    )
     run_opencv = mime == "application/pdf" and (layout_aware or confidence < refinement_threshold)
+    if run_opencv and confidence >= conf_exit:
+        run_opencv = False  # >= 0.90: immediate exit
+        telemetry.emit_with_callback(
+            telemetry_callback,
+            "opencv_skipped",
+            {"reason": "confidence_exit", "confidence": confidence},
+        )
+    elif run_opencv and 0.75 <= confidence < conf_exit:
+        # 0.75-0.90: skip OpenCV unless image-heavy
+        ic = collected_signals.get("image_coverage")
+        if ic is None or ic <= skip_image_guard:
+            run_opencv = False
+            telemetry.emit_with_callback(
+                telemetry_callback,
+                "opencv_skipped",
+                {"reason": "confidence_band_075_090", "confidence": confidence, "image_coverage": ic, "skip_opencv_image_guard": skip_image_guard},
+            )
+    use_light_refinement = (
+        run_opencv and conf_light <= confidence < 0.75
+    )
     if run_opencv and config:
         # Optional heuristics: skip OpenCV when document clearly looks digital
         c = config
@@ -249,9 +343,17 @@ def needs_ocr(
                     text_coverage,
                 )
     if run_opencv:
+        telemetry.emit_with_callback(
+            telemetry_callback,
+            "opencv_run",
+            {"refinement": "light" if use_light_refinement else "full"},
+        )
         if progress_callback:
             progress_callback("opencv_analysis", 0.7)
-        opencv_result = opencv_layout_module.analyze_with_opencv(str(path), page_level=page_level)
+        max_pages = 2 if use_light_refinement else None
+        opencv_result = opencv_layout_module.analyze_with_opencv(
+            str(path), page_level=page_level, max_pages_to_analyze=max_pages
+        )
         if opencv_result:
             # Add OpenCV results to signals BEFORE refining (so hybrid rule can use it)
             collected_signals["opencv_layout"] = opencv_result
@@ -271,8 +373,12 @@ def needs_ocr(
     # Step 6: Determine file type category for user
     file_type_category = _get_file_type_category(mime, extension)
 
-    # Build result dictionary
+    # Build hints (suggested_engine, preprocessing) - only when needs_ocr
+    hints = _compute_adaptive_ocr_signals(collected_signals, needs_ocr_flag)
+
+    # Build result with signal/decision/hints separation (and backward-compat flat keys)
     result = {
+        # Flat keys (backward compatibility)
         "needs_ocr": needs_ocr_flag,
         "file_type": file_type_category,
         "category": category,
@@ -280,10 +386,40 @@ def needs_ocr(
         "reason": reason,
         "reason_code": reason_code,
         "signals": collected_signals,
+        # Structured separation for debugging
+        "decision": {
+            "needs_ocr": needs_ocr_flag,
+            "confidence": confidence,
+            "reason_code": reason_code,
+            "reason": reason,
+        },
+        "hints": {
+            "suggested_engine": hints["suggested_engine"],
+            "suggest_preprocessing": hints["suggest_preprocessing"],
+            "ocr_complexity_score": hints["ocr_complexity_score"],
+        },
     }
 
-    # Add page-level results if available
-    if page_analysis and "pages" in page_analysis:
+    # Add page-level results if available (or synthetic when variance skipped)
+    if skip_page_analysis_for_variance and page_level and text_result and "pages" in text_result:
+        pages_data = text_result["pages"]
+        page_count = len(pages_data)
+        pages_list = [
+            {
+                "page_number": p.get("page_number", i + 1),
+                "needs_ocr": needs_ocr_flag,
+                "text_length": p.get("text_length", 0),
+                "confidence": confidence,
+                "reason_code": reason_code,
+                "reason": reason,
+            }
+            for i, p in enumerate(pages_data)
+        ]
+        result["pages"] = pages_list
+        result["page_count"] = page_count
+        result["pages_needing_ocr"] = page_count if needs_ocr_flag else 0
+        result["pages_with_text"] = 0 if needs_ocr_flag else page_count
+    elif page_analysis and "pages" in page_analysis:
         page_count = page_analysis.get("page_count", 0)
         pages_list = page_analysis.get("pages", [])
 
@@ -326,6 +462,13 @@ def needs_ocr(
                         result["confidence"] = page_analysis["overall_confidence"]
                         result["reason_code"] = page_analysis["overall_reason_code"]
                         result["reason"] = page_analysis["overall_reason"]
+                        result["decision"]["needs_ocr"] = page_analysis["overall_needs_ocr"]
+                        result["decision"]["confidence"] = page_analysis["overall_confidence"]
+                        result["decision"]["reason_code"] = page_analysis["overall_reason_code"]
+                        result["decision"]["reason"] = page_analysis["overall_reason"]
+                        result["hints"] = _compute_adaptive_ocr_signals(
+                            collected_signals, page_analysis["overall_needs_ocr"]
+                        )
                 else:
                     logger.warning(
                         f"Page-level analysis incomplete: {len(pages_list)} pages found, "
@@ -383,6 +526,89 @@ def needs_ocr(
         progress_callback("complete", 1.0)
 
     return result
+
+
+def _compute_adaptive_ocr_signals(
+    signals: Dict[str, Any], needs_ocr: bool
+) -> Dict[str, Any]:
+    """
+    Feature-driven OCR engine suggestion based on ocr_complexity_score.
+    Score components: layout_complexity, image_ratio (blur proxy), text_weakness.
+    Engine tiers: < 0.3 Tesseract | 0.3-0.7 PaddleOCR | > 0.7 Vision LLM.
+    """
+    if not needs_ocr:
+        return {
+            "suggested_engine": None,
+            "suggest_preprocessing": False,
+            "ocr_complexity_score": 0.0,
+        }
+    ocv = signals.get("opencv_layout", {})
+    lc_str = ocv.get("layout_complexity", "simple")
+    layout_complexity = 0.6 if lc_str == "complex" else (0.4 if lc_str == "moderate" else 0.2)
+    ic = signals.get("image_coverage") or 0.0
+    image_ratio = ic / 100.0
+    text_len = signals.get("text_length", 0)
+    text_weakness = 0.3 if text_len < 20 else (0.2 if text_len < 50 else 0.0)
+    # Placeholder components for future: skew_score, blur_score, multilingual_hint, low_contrast
+    skew_score = 0.1 if image_ratio > 0.6 else 0.0
+    ocr_complexity_score = (
+        layout_complexity * 0.3
+        + image_ratio * 0.35
+        + text_weakness * 0.25
+        + skew_score * 0.1
+    )
+    ocr_complexity_score = min(1.0, ocr_complexity_score)
+    if ocr_complexity_score < 0.3:
+        suggested_engine = "tesseract"
+    elif ocr_complexity_score < 0.7:
+        suggested_engine = "paddle"
+    else:
+        suggested_engine = "vision_llm"
+    preprocess = []
+    if ic > 60 or layout_complexity >= 0.4:
+        preprocess.append("deskew")
+    if ic > 50 or text_len < 30:
+        preprocess.append("otsu")
+    if ic > 70:
+        preprocess.append("denoise")
+    return {
+        "suggested_engine": suggested_engine,
+        "suggest_preprocessing": list(dict.fromkeys(preprocess)),
+        "ocr_complexity_score": round(ocr_complexity_score, 2),
+    }
+
+
+def _build_result(
+    needs_ocr: bool,
+    file_type_category: str,
+    category: str,
+    confidence: float,
+    reason: str,
+    reason_code: str,
+    signals: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Build result with signal/decision/hints separation."""
+    hints = _compute_adaptive_ocr_signals(signals, needs_ocr)
+    return {
+        "needs_ocr": needs_ocr,
+        "file_type": file_type_category,
+        "category": category,
+        "confidence": confidence,
+        "reason": reason,
+        "reason_code": reason_code,
+        "signals": signals,
+        "decision": {
+            "needs_ocr": needs_ocr,
+            "confidence": confidence,
+            "reason_code": reason_code,
+            "reason": reason,
+        },
+        "hints": {
+            "suggested_engine": hints["suggested_engine"],
+            "suggest_preprocessing": hints["suggest_preprocessing"],
+            "ocr_complexity_score": hints["ocr_complexity_score"],
+        },
+    }
 
 
 def _get_file_type_category(mime: str, extension: str) -> str:

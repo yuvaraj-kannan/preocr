@@ -1,7 +1,7 @@
 """Layout analysis for PDFs to detect text regions, images, and mixed content."""
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .. import exceptions
 from ..utils.logger import get_logger, suppress_pdf_warnings
@@ -81,6 +81,97 @@ def analyze_pdf_layout(file_path: str, page_level: bool = False) -> Dict[str, An
     if page_level:
         result["pages"] = []
     return result
+
+
+def get_quick_image_coverage(file_path: str) -> Optional[float]:
+    """
+    Fast image coverage check using PyMuPDF (no full layout analysis).
+
+    Used for Hard Scan Shortcut: when image_coverage > 85 and text_length < 10,
+    we can exit early without running layout or OpenCV.
+
+    Returns:
+        Image coverage percentage (0-100) or None if unavailable/failed.
+    """
+    if fitz is None:
+        return None
+
+    path = Path(file_path)
+    try:
+        with suppress_pdf_warnings():
+            doc = fitz.open(path)
+            total_image_area = 0.0
+            total_page_area = 0.0
+            try:
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
+                    page_rect = page.rect
+                    page_area = page_rect.width * page_rect.height
+                    total_page_area += page_area
+                    for img in page.get_images():
+                        try:
+                            xref = img[0]
+                            for rect in page.get_image_rects(xref):
+                                total_image_area += rect.width * rect.height
+                        except Exception:
+                            pass
+            finally:
+                doc.close()
+        if total_page_area > 0:
+            return round((total_image_area / total_page_area) * 100, 2)
+        return 0.0
+    except Exception as e:
+        logger.debug(f"Quick image coverage failed for {file_path}: {e}")
+        return None
+
+
+def get_pdf_font_count(file_path: str, max_pages: int = 5) -> Optional[int]:
+    """
+    Fast font count extraction from PDF. font_count == 0 is a strong scan indicator
+    (scanned PDFs often have no embedded fonts; digital PDFs have fonts).
+
+    Returns:
+        Number of unique fonts, or None if unavailable.
+    """
+    path = Path(file_path)
+    fonts: set = set()
+
+    if pdfplumber:
+        try:
+            with suppress_pdf_warnings():
+                with pdfplumber.open(path) as pdf:
+                    for i, page in enumerate(pdf.pages):
+                        if i >= max_pages:
+                            break
+                        chars = page.chars if hasattr(page, "chars") else []
+                        for c in chars:
+                            fn = c.get("fontname")
+                            if fn:
+                                fonts.add(str(fn))
+        except Exception as e:
+            logger.debug(f"Font count extraction failed (pdfplumber) for {file_path}: {e}")
+            return None
+
+    if fitz and not fonts:
+        try:
+            with suppress_pdf_warnings():
+                doc = fitz.open(path)
+                try:
+                    for i in range(min(len(doc), max_pages)):
+                        page = doc[i]
+                        for block in page.get_text("dict", flags=0).get("blocks", []):
+                            for line in block.get("lines", []):
+                                for span in line.get("spans", []):
+                                    fn = span.get("font")
+                                    if fn:
+                                        fonts.add(str(fn))
+                finally:
+                    doc.close()
+        except Exception as e:
+            logger.debug(f"Font count extraction failed (PyMuPDF) for {file_path}: {e}")
+            return None
+
+    return len(fonts)
 
 
 def _analyze_with_pdfplumber(path: Path, page_level: bool = False) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from ..core.detector import needs_ocr
 from ..utils.logger import get_logger
+from ..utils import telemetry
 
 from ._extract import extract_per_page_texts
 from .config import PlannerConfig
@@ -51,6 +52,23 @@ def plan_ocr_for_document(
         raise FileNotFoundError(f"File not found: {file_path}")
 
     cfg = config or PlannerConfig()
+
+    # Step 0: Confidence exit - try fast path first; if confident, skip full planner
+    if cfg.confidence_exit_threshold > 0:
+        fast_result = needs_ocr(
+            str(path),
+            page_level=False,
+            layout_aware=False,
+        )
+        if fast_result.get("confidence", 0) >= cfg.confidence_exit_threshold:
+            telemetry.emit(
+                "planner_confidence_exit",
+                {
+                    "confidence": fast_result.get("confidence", 0),
+                    "needs_ocr": fast_result.get("needs_ocr", True),
+                },
+            )
+            return _build_confidence_exit_result(fast_result, cfg)
 
     # Step 1: Call preocr for base signals (page_level=True, layout_aware=True)
     pre_result = needs_ocr(
@@ -174,6 +192,46 @@ def plan_ocr_for_document(
         "overall_confidence": round(overall_confidence, 2),
         "summary_reason": summary_reason,
         "metrics": metrics,
+    }
+
+
+def _build_confidence_exit_result(
+    fast_result: Dict[str, Any], cfg: PlannerConfig
+) -> Dict[str, Any]:
+    """Build result when confidence exit applies: fast path was confident enough."""
+    needs_ocr = fast_result.get("needs_ocr", True)
+    conf = fast_result.get("confidence", 0.85)
+    page_count = fast_result.get("signals", {}).get("page_count", 1) or 1
+    pages = [
+        {
+            "page_number": i + 1,
+            "needs_ocr": needs_ocr,
+            "decision_type": "confidence_exit",
+            "reason": f"Confidence exit: {conf:.2f} >= {cfg.confidence_exit_threshold}; skipped planner.",
+            "confidence": conf,
+            "decision_version": cfg.decision_version,
+            "debug": {
+                "terminal_override": False,
+                "confidence_exit": True,
+                "score": 1.0 if needs_ocr else 0.0,
+                "components": {
+                    "intent": 0,
+                    "image_dominance": 0.5 if needs_ocr else 0,
+                    "text_weakness": 0.5 if needs_ocr else 0,
+                    "failsafe_boost": 0,
+                },
+            },
+        }
+        for i in range(page_count)
+    ]
+    return {
+        "decision_version": cfg.decision_version,
+        "needs_ocr_any": needs_ocr,
+        "pages": pages,
+        "pages_needing_ocr": list(range(page_count)) if needs_ocr else [],
+        "overall_confidence": round(conf, 2),
+        "summary_reason": f"Confidence exit ({conf:.2f}); skipped planner.",
+        "metrics": {"terminal_override": 0, "scored": 0, "confidence_exit": page_count},
     }
 
 

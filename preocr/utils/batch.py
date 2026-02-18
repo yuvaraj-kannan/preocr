@@ -11,6 +11,7 @@ from ..core.detector import needs_ocr
 from ..planner import plan_ocr_for_document
 from ..planner.config import PlannerConfig
 from .logger import get_logger
+from . import telemetry
 
 Config = constants.Config
 logger = get_logger(__name__)
@@ -621,4 +622,20 @@ class BatchProcessor:
                         )
 
         results.end_time = time.time()
+        # Emit batch summary for telemetry
+        if results.results:
+            needs_ocr_count = sum(1 for r in results.results if r.get("needs_ocr") is True)
+            no_ocr_count = sum(1 for r in results.results if r.get("needs_ocr") is False)
+            telemetry.emit(
+                "batch_complete",
+                {
+                    "total": len(results.results),
+                    "needs_ocr": needs_ocr_count,
+                    "no_ocr": no_ocr_count,
+                    "errors": len(results.errors),
+                    "elapsed_seconds": round(results.end_time - results.start_time, 2)
+                    if results.start_time
+                    else 0,
+                },
+            )
         return results
