@@ -632,7 +632,7 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
 
 ### Recent Updates
 
-**v2.0.0** - Accuracy & Performance (Latest)
+**v1.5.0** - Accuracy & Performance (Latest)
 - ✅ **100% Accuracy**: Fixed false positives on digital PDFs; benchmark validation at 100%
 - ✅ **OpenCV Skip Heuristics**: Skip OpenCV for clearly digital documents (configurable by file size, page count)
 - ✅ **Digital/Table Bias Rules**: New config options to reduce false positives on product manuals, marketing PDFs

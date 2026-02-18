@@ -234,7 +234,35 @@ def decide(
         )
         image_ratio = effective_image_coverage / 100.0 if effective_image_coverage > 0 else 0.0
 
-        # 2. Hard Scan Check - image_coverage >= 80% AND text_length < 20 → OCR
+        # 2a. Digital-but-low-quality: text layer exists but is broken/invisible (garbage)
+        # High noise ratio → treat as scan to prevent false negatives
+        non_printable = signals.get("non_printable_ratio", 0.0)
+        unicode_noise = signals.get("unicode_noise_ratio", 0.0)
+        if (non_printable > 0.05 or unicode_noise > 0.08) and text_length > 0:
+            confidence = calculate_confidence_from_signals(
+                signals, needs_ocr=True, ocr_score=None, config=config
+            )
+            return (
+                True,
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (low-quality text layer: non_printable={non_printable*100:.1f}%, unicode_noise={unicode_noise*100:.1f}%)",
+                max(confidence, 0.75),
+                CATEGORY_UNSTRUCTURED,
+                ReasonCode.PDF_SCANNED,
+            )
+
+        # 2b. Font count signal: font_count == 0 is strong scan indicator (scanned PDFs often
+        # have no embedded fonts; some embed invisible garbage text, so text_length can lie)
+        font_count = signals.get("font_count")
+        if font_count is not None and font_count == 0 and text_length < config.hard_scan_text_max:
+            return (
+                True,
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (no embedded fonts, {text_length} chars - strong scan signal)",
+                config.high_confidence,
+                CATEGORY_UNSTRUCTURED,
+                ReasonCode.PDF_SCANNED,
+            )
+
+        # 2c. Hard Scan Check - image_coverage >= 80% AND text_length < 20 → OCR
         if (
             effective_image_coverage >= config.hard_scan_image_coverage_min
             and text_length < config.hard_scan_text_max

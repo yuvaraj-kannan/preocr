@@ -81,6 +81,9 @@ layout-refinement = [
 batch = [
     "tqdm>=4.65.0",
 ]
+benchmark = [
+    "matplotlib>=3.7.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/yuvaraj3855/preocr"

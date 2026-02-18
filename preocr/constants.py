@@ -22,12 +22,27 @@ LOW_CONFIDENCE = 0.5
 # If initial confidence is below this, use OpenCV for refinement
 LAYOUT_REFINEMENT_THRESHOLD = 0.9
 
+# Confidence band for tiered refinement (refined thresholds)
+# >= 0.90: immediate exit (skip OpenCV)
+# 0.75-0.90: skip OpenCV unless image-heavy
+# 0.50-0.75: sample 2-3 pages (light refinement)
+# < 0.50: full refinement
+CONFIDENCE_EXIT_THRESHOLD = 0.90
+CONFIDENCE_LIGHT_REFINEMENT_MIN = 0.50
+# In 0.75-0.90 confidence band: skip OpenCV unless image_coverage > this (%)
+# Tunable per domain (e.g. financial PDFs vs product manuals)
+SKIP_OPENCV_IMAGE_GUARD = 50.0
+
 # Hard Digital Check: extractable text >= this → NO OCR (early exit)
 HARD_DIGITAL_TEXT_THRESHOLD = 20
 
 # Hard Scan Check: image_coverage >= this AND text_length <= hard_scan_text_max → OCR
 HARD_SCAN_IMAGE_COVERAGE_MIN = 80.0
 HARD_SCAN_TEXT_MAX = 20
+
+# Hard Scan Shortcut: stricter check for obvious scans - direct exit, no layout/OpenCV
+HARD_SCAN_SHORTCUT_IMAGE_MIN = 85.0
+HARD_SCAN_SHORTCUT_TEXT_MAX = 10
 
 
 @dataclass
@@ -50,6 +65,11 @@ class Config:
         layout_refinement_threshold: Confidence threshold for triggering OpenCV layout analysis.
                                     If initial confidence is below this, use OpenCV for refinement.
                                     Default: 0.9 (90%).
+        confidence_exit_threshold: Skip OpenCV entirely when confidence >= this. Default: 0.90.
+        confidence_light_refinement_min: Use light refinement (2-3 pages) when confidence
+            in [this, confidence_exit_threshold). Full refinement when < this. Default: 0.50.
+        skip_opencv_image_guard: In 0.75-0.90 band, skip OpenCV unless image_coverage > this (%).
+            Default 50. Tunable per domain.
 
         high_confidence: Threshold for high confidence decisions. Default: 0.9.
 
@@ -76,10 +96,15 @@ class Config:
         hard_digital_text_threshold: Hard Digital Check - if text_length >= this, NO OCR (early exit). Default: 20.
         hard_scan_image_coverage_min: Hard Scan Check - if image_coverage >= this AND text_length <= hard_scan_text_max, OCR. Default: 80.
         hard_scan_text_max: Hard Scan Check - max text_length for hard scan. Default: 20.
+        variance_page_escalation_threshold: Only run full page-level when variance(page_scores) > this.
+            When variance <= threshold, use doc-level for all pages (speed win for uniform docs). 0 = disabled.
 
     Example:
         >>> # Use default thresholds
         >>> config = Config()
+        >>>
+        >>> # Customize for image-heavy domain (e.g. product manuals)
+        >>> config = Config(skip_opencv_image_guard=60.0)
         >>>
         >>> # Customize thresholds for stricter detection
         >>> strict_config = Config(
@@ -92,6 +117,9 @@ class Config:
     min_text_length: int = MIN_TEXT_LENGTH
     min_office_text_length: int = MIN_OFFICE_TEXT_LENGTH
     layout_refinement_threshold: float = LAYOUT_REFINEMENT_THRESHOLD
+    confidence_exit_threshold: float = CONFIDENCE_EXIT_THRESHOLD
+    confidence_light_refinement_min: float = CONFIDENCE_LIGHT_REFINEMENT_MIN
+    skip_opencv_image_guard: float = SKIP_OPENCV_IMAGE_GUARD
     high_confidence: float = HIGH_CONFIDENCE
     medium_confidence: float = MEDIUM_CONFIDENCE
     low_confidence: float = LOW_CONFIDENCE
@@ -109,6 +137,8 @@ class Config:
     hard_digital_text_threshold: int = HARD_DIGITAL_TEXT_THRESHOLD
     hard_scan_image_coverage_min: float = HARD_SCAN_IMAGE_COVERAGE_MIN
     hard_scan_text_max: int = HARD_SCAN_TEXT_MAX
+    variance_page_escalation_threshold: float = 0.2  # 0 = disabled (legacy: variance)
+    variance_page_escalation_std: float = 0.18  # Enable full page-level when std(page_scores) > this
 
     def __post_init__(self) -> None:
         """Validate threshold values."""
