@@ -147,6 +147,17 @@ results.print_summary()
 
 See [docs/OCR_DECISION_MODEL.md](docs/OCR_DECISION_MODEL.md) for the full specification.
 
+### Preprocessing for OCR (`prepare_for_ocr`)
+
+- **Detection-Driven**: Uses `needs_ocr` hints (`suggest_preprocessing`) when `steps="auto"`
+- **Pipeline Steps**: denoise, deskew, otsu, rescale (ordered automatically)
+- **Modes**: `quality` (full) or `fast` (skip denoise/rescale; deskew severe-only)
+- **Guardrails**: Otsu precondition (denoise before otsu); optional `config.auto_fix`
+- **Sources**: PDF (PyMuPDF), images (PNG/JPG/TIFF), numpy arrays
+- **Observability**: `return_meta=True` → `applied_steps`, `skipped_steps`, `auto_detected`
+
+Requires `pip install preocr[layout-refinement]`.
+
 ### Document Extraction (`extract_native_data`)
 
 - **Element Classification**: 11+ element types (Title, NarrativeText, Table, Header, Footer, etc.)
@@ -330,20 +341,47 @@ print(f"Processed: {stats['processed']} files")
 print(f"Needs OCR: {stats['needs_ocr']} ({stats['needs_ocr']/stats['processed']*100:.1f}%)")
 ```
 
+### Preprocessing for OCR (`prepare_for_ocr`)
+
+Apply detection-aware preprocessing before OCR. Use `steps="auto"` to let `needs_ocr` hints drive which steps run:
+
+```python
+from preocr import needs_ocr, prepare_for_ocr
+
+# Option A: steps="auto" (uses needs_ocr hints automatically)
+result, meta = prepare_for_ocr("scan.pdf", steps="auto", return_meta=True)
+print(meta["applied_steps"])  # e.g. ['otsu', 'deskew']
+
+# Option B: Wire hints manually
+ocr_result = needs_ocr("scan.pdf", layout_aware=True)
+if ocr_result["needs_ocr"]:
+    hints = ocr_result["hints"]
+    preprocess = hints.get("suggest_preprocessing", [])
+    preprocessed = prepare_for_ocr("scan.pdf", steps=preprocess)
+
+# Option C: Explicit steps
+preprocessed = prepare_for_ocr(img_array, steps=["denoise", "otsu"], mode="fast")
+
+# Option D: No preprocessing
+preprocessed = prepare_for_ocr(img, steps=None)  # unchanged
+```
+
+**Steps**: `denoise` → `deskew` → `otsu` → `rescale`. **Modes**: `quality` (full) or `fast` (skip denoise/rescale). Requires `pip install preocr[layout-refinement]`.
+
 ### Integration with OCR Engines
 
 ```python
-from preocr import needs_ocr, extract_native_data
+from preocr import needs_ocr, prepare_for_ocr, extract_native_data
 
 def process_document(file_path):
     ocr_check = needs_ocr(file_path, layout_aware=True)
 
     if ocr_check["needs_ocr"]:
-        # Use hints for engine selection and preprocessing
+        # Preprocess then run OCR (steps from hints, or use steps="auto")
+        preprocessed = prepare_for_ocr(file_path, steps="auto")
         hints = ocr_check["hints"]
         engine = hints.get("suggested_engine", "tesseract")  # tesseract | paddle | vision_llm
-        preprocess = hints.get("suggest_preprocessing", [])  # e.g. ["deskew", "otsu"]
-        # Run OCR with chosen engine
+        # Run OCR on preprocessed image(s)
         return {"source": "ocr", "engine": engine, "text": "..."}
     else:
         result = extract_native_data(file_path)
@@ -572,7 +610,7 @@ result["hints"]          # {suggested_engine, suggest_preprocessing, ocr_complex
 
 When `needs_ocr=True`, `hints` provides:
 - **suggested_engine**: `tesseract` (< 0.3) | `paddle` (0.3–0.7) | `vision_llm` (> 0.7)
-- **suggest_preprocessing**: e.g. `["deskew", "otsu", "denoise"]`
+- **suggest_preprocessing**: e.g. `["deskew", "otsu", "denoise"]` — use with `prepare_for_ocr(path, steps="auto")`
 - **ocr_complexity_score**: 0.0–1.0, drives engine selection
 
 ### Pipeline Performance
@@ -636,6 +674,23 @@ Batch processor for multiple files with parallel processing.
 
 **Methods:**
 - `process_directory(directory, progress=True) -> BatchResults`
+
+### `prepare_for_ocr(source, steps=None, mode="quality", return_meta=False, pages=None, dpi=300, config=None)`
+
+Prepare image(s) for OCR using detection-aware preprocessing.
+
+**Parameters:**
+- `source` (str, Path, or ndarray): File path or numpy array
+- `steps` (None | "auto" | list | dict): `None` = no preprocessing; `"auto"` = use `needs_ocr` hints; list/dict = explicit steps
+- `mode` (str): `"quality"` (full) or `"fast"` (skip denoise, rescale; deskew severe-only)
+- `return_meta` (bool): Return `(img, meta)` with applied_steps, skipped_steps, auto_detected
+- `pages` (list): For PDFs, 1-indexed page numbers (default: None = all)
+- `dpi` (int): Target DPI for rescale step (default: 300)
+- `config` (PreprocessConfig): Optional; `auto_fix=True` auto-adds denoise when otsu requested
+
+**Returns:** Processed numpy array or list of arrays. With `return_meta=True`: `(img, meta)`.
+
+**Requires:** `pip install preocr[layout-refinement]` (OpenCV, PyMuPDF for PDFs)
 
 ---
 
@@ -728,6 +783,8 @@ pip install -e ".[dev]"
 pytest
 
 # Run benchmarks (add PDFs to datasets/ for testing)
+python examples/test_preprocess_flow.py  # Preprocess flow (needs layout-refinement)
+python scripts/benchmark_preprocess_accuracy.py datasets  # Preprocess + accuracy
 python scripts/benchmark_accuracy.py datasets -g scripts/ground_truth_data_source_formats.json --layout-aware --page-level
 python scripts/benchmark_batch_full.py datasets -v  # Full dataset, PDF-wise log, diagram
 python scripts/benchmark_planner.py datasets
@@ -745,7 +802,11 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
 
 ### Recent Updates
 
-**v1.6.0** - Signal/Decision Separation & Confidence Band (Latest)
+**v1.7.0** - Preprocess Module (Latest)
+- ✅ **prepare_for_ocr**: Detection-aware preprocessing (denoise, deskew, otsu, rescale)
+- ✅ `steps="auto"` uses needs_ocr hints; `quality` / `fast` modes
+
+**v1.6.0** - Signal/Decision Separation & Confidence Band
 - ✅ **Signal/Decision/Hints Separation**: Structured output for debugging and downstream routing
 - ✅ **Hard Scan Font Guard**: `font_count == 0` required for hard scan shortcut (avoids false positives on digital PDFs with background images)
 - ✅ **Refined Confidence Band**: ≥0.90 exit, 0.75–0.90 skip unless image-heavy, 0.50–0.75 light, <0.50 full
