@@ -14,6 +14,7 @@ Image: Optional[Any] = None
 try:
     import cv2 as _cv2
     import numpy as _np_mod
+
     cv2 = _cv2
     _np = _np_mod
 except ImportError:
@@ -21,12 +22,14 @@ except ImportError:
 
 try:
     import fitz as _fitz  # PyMuPDF
+
     fitz = _fitz
 except ImportError:
     pass
 
 try:
     from PIL import Image as _PilImage
+
     Image = _PilImage
 except ImportError:
     pass
@@ -86,8 +89,7 @@ def _pdf_page_to_array(
     assert cv2 is not None  # ensured by _ensure_opencv
     if fitz is None:
         raise ImportError(
-            "PyMuPDF (fitz) is required for PDF preprocessing. "
-            "Install with: pip install pymupdf"
+            "PyMuPDF (fitz) is required for PDF preprocessing. " "Install with: pip install pymupdf"
         )
 
     zoom = dpi / 72

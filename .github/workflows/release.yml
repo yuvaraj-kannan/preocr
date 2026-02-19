@@ -27,7 +27,7 @@ jobs:
       - name: Extract version from version.py
         id: version
         run: |
-          VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from preocr.version import __version__; print(__version__)")
+          VERSION=$(python -c "exec(open('preocr/version.py').read()); print(__version__)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
       
@@ -67,8 +67,7 @@ jobs:
         run: |
           python -c "
           import sys
-          sys.path.insert(0, '.')
-          from preocr.version import __version__
+          exec(open('preocr/version.py').read())
           
           # Use tomllib for Python >= 3.11, tomli for older versions
           if sys.version_info >= (3, 11):
@@ -104,12 +103,13 @@ jobs:
       - name: Validate version in __init__.py
         run: |
           python -c "
-          import sys
-          sys.path.insert(0, '.')
-          from preocr import __version__
-          from preocr.version import __version__ as version_py
-          assert __version__ == version_py, f'Version mismatch: __init__.py has {__version__}, version.py has {version_py}'
-          print(f'✓ __init__.py version matches: {__version__}')
+          exec(open('preocr/version.py').read())
+          version_py = __version__
+          import re
+          with open('preocr/__init__.py') as f:
+              m = re.search(r'from \\.version import __version__', f.read())
+          assert m, '__init__.py should re-export __version__ from .version'
+          print(f'✓ __init__.py imports version from version.py: {version_py}')
           "
 
   build-and-publish:
@@ -139,7 +139,7 @@ jobs:
       - name: Verify version before build
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
-          CODE_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from preocr.version import __version__; print(__version__)")
+          CODE_VERSION=$(python -c "exec(open('preocr/version.py').read()); print(__version__)")
           echo "Tag version: $TAG_VERSION"
           echo "Code version: $CODE_VERSION"
           if [ "$TAG_VERSION" != "$CODE_VERSION" ]; then

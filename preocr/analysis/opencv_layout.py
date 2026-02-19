@@ -85,7 +85,7 @@ def analyze_with_opencv(
                 other_pages = [i for i in range(1, total_pages - 1) if i != total_pages // 2]
                 pages_to_analyze.extend(random.sample(other_pages, additional))
         if max_pages_to_analyze is not None and max_pages_to_analyze > 0:
-            pages_to_analyze = pages_to_analyze[: max_pages_to_analyze]
+            pages_to_analyze = pages_to_analyze[:max_pages_to_analyze]
 
         overall_text_area = 0.0
         overall_image_area = 0.0

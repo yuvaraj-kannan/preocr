@@ -8,6 +8,7 @@ import numpy as np
 cv2: Optional[Any] = None
 try:
     import cv2 as _cv2
+
     cv2 = _cv2
 except ImportError:
     pass
@@ -37,7 +38,11 @@ def _otsu_binarize(img: np.ndarray, **kwargs: Any) -> Tuple[np.ndarray, bool]:
 
     # Ensure grayscale
     if len(img.shape) == 3:
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if img.shape[2] == 3 else cv2.cvtColor(img, cv2.COLOR_RGBA2GRAY)
+        gray = (
+            cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            if img.shape[2] == 3
+            else cv2.cvtColor(img, cv2.COLOR_RGBA2GRAY)
+        )
     else:
         gray = img.copy()
 

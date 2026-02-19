@@ -20,6 +20,7 @@ from preocr.utils.logger import get_logger
 fitz: Optional[Any] = None
 try:
     import fitz as _fitz
+
     fitz = _fitz
 except ImportError:
     pass
@@ -38,7 +39,7 @@ class PreprocessConfig:
 
 
 def _normalize_steps(
-    steps: Union[List[str], Tuple[str, ...], Dict[str, Any]]
+    steps: Union[List[str], Tuple[str, ...], Dict[str, Any]],
 ) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
     """
     Normalize steps from list or dict format.
@@ -48,7 +49,9 @@ def _normalize_steps(
     """
     if isinstance(steps, dict):
         step_names = [k for k in steps.keys() if k in SUPPORTED_STEPS]
-        kwargs_map = {k: v if isinstance(v, dict) else {} for k, v in steps.items() if k in SUPPORTED_STEPS}
+        kwargs_map = {
+            k: v if isinstance(v, dict) else {} for k, v in steps.items() if k in SUPPORTED_STEPS
+        }
         return step_names, kwargs_map
     if isinstance(steps, (list, tuple)):
         step_names = [s for s in steps if s in SUPPORTED_STEPS]
@@ -93,11 +96,13 @@ def _apply_mode_filter(step_names: List[str], mode: str) -> List[str]:
 
 def _order_steps(step_names: List[str]) -> List[str]:
     """Sort steps by PIPELINE_ORDER."""
+
     def key(s: str) -> int:
         try:
             return PIPELINE_ORDER.index(s)
         except ValueError:
             return 999
+
     return sorted(step_names, key=key)
 
 
@@ -172,7 +177,11 @@ def prepare_for_ocr(
         imgs = _load_source(source, pages, dpi)
         result: Union[np.ndarray, List[np.ndarray]] = imgs
         if return_meta:
-            empty_meta: Dict[str, Any] = {"applied_steps": [], "skipped_steps": [], "auto_detected": False}
+            empty_meta: Dict[str, Any] = {
+                "applied_steps": [],
+                "skipped_steps": [],
+                "auto_detected": False,
+            }
             return (result, empty_meta)
         return result
 
@@ -184,6 +193,7 @@ def prepare_for_ocr(
             resolved_steps = DEFAULT_STEPS
         elif isinstance(source, (str, Path)):
             from preocr.core.detector import needs_ocr
+
             needs_ocr_result = needs_ocr(str(source), page_level=False, layout_aware=True)
             hints = needs_ocr_result.get("hints", {}) or {}
             suggested = hints.get("suggest_preprocessing")
@@ -206,9 +216,7 @@ def prepare_for_ocr(
 
     imgs_raw = _load_source(source, pages, dpi)
     is_list = isinstance(imgs_raw, list)
-    img_list: List[np.ndarray] = (
-        list(imgs_raw) if is_list else [cast(np.ndarray, imgs_raw)]
-    )
+    img_list: List[np.ndarray] = list(imgs_raw) if is_list else [cast(np.ndarray, imgs_raw)]
 
     processed: List[np.ndarray] = []
     all_applied: List[str] = []
@@ -251,7 +259,9 @@ def _load_source(
 
     if _is_pdf(path):
         if fitz is None:
-            raise ImportError("PyMuPDF (fitz) is required for PDF preprocessing. Install with: pip install pymupdf")
+            raise ImportError(
+                "PyMuPDF (fitz) is required for PDF preprocessing. Install with: pip install pymupdf"
+            )
         doc = fitz.open(str(path))
         total = len(doc)
         doc.close()

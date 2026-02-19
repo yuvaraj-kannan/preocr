@@ -633,9 +633,9 @@ class BatchProcessor:
                     "needs_ocr": needs_ocr_count,
                     "no_ocr": no_ocr_count,
                     "errors": len(results.errors),
-                    "elapsed_seconds": round(results.end_time - results.start_time, 2)
-                    if results.start_time
-                    else 0,
+                    "elapsed_seconds": (
+                        round(results.end_time - results.start_time, 2) if results.start_time else 0
+                    ),
                 },
             )
         return results

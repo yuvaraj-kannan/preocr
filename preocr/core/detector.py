@@ -238,7 +238,7 @@ def needs_ocr(
                 if len(scores) >= 2:
                     mean_s = sum(scores) / len(scores)
                     var_s = sum((x - mean_s) ** 2 for x in scores) / len(scores)
-                    std_s = (var_s ** 0.5) if var_s > 0 else 0.0
+                    std_s = (var_s**0.5) if var_s > 0 else 0.0
                     if std_s <= std_threshold:
                         skip_page_analysis_for_variance = True
             if not skip_page_analysis_for_variance:
@@ -297,11 +297,14 @@ def needs_ocr(
             telemetry.emit_with_callback(
                 telemetry_callback,
                 "opencv_skipped",
-                {"reason": "confidence_band_075_090", "confidence": confidence, "image_coverage": ic, "skip_opencv_image_guard": skip_image_guard},
+                {
+                    "reason": "confidence_band_075_090",
+                    "confidence": confidence,
+                    "image_coverage": ic,
+                    "skip_opencv_image_guard": skip_image_guard,
+                },
             )
-    use_light_refinement = (
-        run_opencv and conf_light <= confidence < 0.75
-    )
+    use_light_refinement = run_opencv and conf_light <= confidence < 0.75
     if run_opencv and config:
         # Optional heuristics: skip OpenCV when document clearly looks digital
         c = config
@@ -528,9 +531,7 @@ def needs_ocr(
     return result
 
 
-def _compute_adaptive_ocr_signals(
-    signals: Dict[str, Any], needs_ocr: bool
-) -> Dict[str, Any]:
+def _compute_adaptive_ocr_signals(signals: Dict[str, Any], needs_ocr: bool) -> Dict[str, Any]:
     """
     Feature-driven OCR engine suggestion based on ocr_complexity_score.
     Score components: layout_complexity, image_ratio (blur proxy), text_weakness.
@@ -552,10 +553,7 @@ def _compute_adaptive_ocr_signals(
     # Placeholder components for future: skew_score, blur_score, multilingual_hint, low_contrast
     skew_score = 0.1 if image_ratio > 0.6 else 0.0
     ocr_complexity_score = (
-        layout_complexity * 0.3
-        + image_ratio * 0.35
-        + text_weakness * 0.25
-        + skew_score * 0.1
+        layout_complexity * 0.3 + image_ratio * 0.35 + text_weakness * 0.25 + skew_score * 0.1
     )
     ocr_complexity_score = min(1.0, ocr_complexity_score)
     if ocr_complexity_score < 0.3:

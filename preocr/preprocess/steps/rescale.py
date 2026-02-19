@@ -8,6 +8,7 @@ import numpy as np
 cv2: Optional[Any] = None
 try:
     import cv2 as _cv2
+
     cv2 = _cv2
 except ImportError:
     pass

@@ -33,7 +33,7 @@ jobs:
       - name: Extract version from version.py
         id: version
         run: |
-          VERSION=$(python -c "import sys; sys.path.insert(0, '.'); from preocr.version import __version__; print(__version__)")
+          VERSION=$(python -c "exec(open('preocr/version.py').read()); print(__version__)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
       

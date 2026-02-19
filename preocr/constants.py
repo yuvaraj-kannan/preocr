@@ -138,7 +138,9 @@ class Config:
     hard_scan_image_coverage_min: float = HARD_SCAN_IMAGE_COVERAGE_MIN
     hard_scan_text_max: int = HARD_SCAN_TEXT_MAX
     variance_page_escalation_threshold: float = 0.2  # 0 = disabled (legacy: variance)
-    variance_page_escalation_std: float = 0.18  # Enable full page-level when std(page_scores) > this
+    variance_page_escalation_std: float = (
+        0.18  # Enable full page-level when std(page_scores) > this
+    )
 
     def __post_init__(self) -> None:
         """Validate threshold values."""
