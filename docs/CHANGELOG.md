@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-02-19
+
+### Added
+- **Preprocess Module (`prepare_for_ocr`)**: Detection-aware preprocessing pipeline for OCR conditioning
+  - Flow: `needs_ocr()` → `hints["suggest_preprocessing"]` → `prepare_for_ocr(steps="auto")`
+  - Steps: denoise, deskew, otsu, rescale (ordered by pipeline)
+  - `steps=None`: no preprocessing; `steps="auto"`: detection-driven from hints; explicit list supported
+  - Modes: `quality` (full) or `fast` (skip denoise/rescale; deskew severe-only)
+  - Guardrails: Otsu precondition (denoise before otsu); config.auto_fix to auto-add denoise
+  - Observability: `return_meta=True` returns `applied_steps`, `skipped_steps`, `auto_detected`
+  - Supports PDFs (PyMuPDF), images (PNG/JPG/TIFF), and numpy arrays
+  - Example: `examples/test_preprocess_flow.py`; benchmark: `scripts/benchmark_preprocess_accuracy.py`
+
 ## [1.6.0] - 2026-02-18
 
 ### Added
@@ -399,7 +412,8 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.7.0
 [1.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.6.0
 [1.5.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.5.0
 [1.4.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.4.0

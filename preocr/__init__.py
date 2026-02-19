@@ -3,6 +3,7 @@
 from .core.detector import needs_ocr
 from .core.extractor import extract_native_data
 from .planner import intent_refinement, plan_ocr_for_document
+from .preprocess import PreprocessConfig, prepare_for_ocr
 from .utils.batch import BatchProcessor, BatchResults
 from .version import __version__
 
@@ -11,6 +12,7 @@ from .version import __version__
 from . import constants, exceptions, reason_codes
 from .analysis import layout_analyzer, opencv_layout, page_detection
 from .core import decision, detector, signals, extractor
+from . import preprocess
 from .probes import image_probe, office_probe, pdf_probe, text_probe
 from .utils import batch, cache, filetype, logger
 
@@ -21,12 +23,14 @@ __all__ = [
     # Main API
     "needs_ocr",
     "extract_native_data",
+    "prepare_for_ocr",
     "plan_ocr_for_document",
     "intent_refinement",
     "__version__",
     "BatchProcessor",
     "BatchResults",
     "Config",
+    "PreprocessConfig",
     # Modules (for backward compatibility)
     "constants",
     "exceptions",
@@ -42,6 +46,7 @@ __all__ = [
     "layout_analyzer",
     "opencv_layout",
     "page_detection",
+    "preprocess",
     "image_probe",
     "office_probe",
     "pdf_probe",

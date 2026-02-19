@@ -77,6 +77,7 @@ dev = [
 layout-refinement = [
     "opencv-python-headless>=4.8.0",
     "numpy>=1.24.0",
+    "pymupdf>=1.23.0",
 ]
 batch = [
     "tqdm>=4.65.0",
