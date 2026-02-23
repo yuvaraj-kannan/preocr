@@ -45,7 +45,9 @@ def format_as_json(result: ExtractionResult) -> Dict[str, Any]:
     return result.model_dump(mode="json")
 
 
-def format_as_markdown(result: ExtractionResult, clean: bool = False, structured: bool = False) -> str:
+def format_as_markdown(
+    result: ExtractionResult, clean: bool = False, structured: bool = False
+) -> str:
     """
     Format result as LLM-ready markdown.
 
@@ -308,12 +310,7 @@ def _is_table_header(row: list) -> bool:
     numeric_ratio = digit_count / total_relevant
     numeric_cells = _count_numeric_cells(row)
     avg_words = _avg_cell_word_count(row)
-    return (
-        alpha_ratio > 0.6
-        and numeric_ratio < 0.2
-        and numeric_cells <= 1
-        and avg_words <= 4.0
-    )
+    return alpha_ratio > 0.6 and numeric_ratio < 0.2 and numeric_cells <= 1 and avg_words <= 4.0
 
 
 def _is_table_row(row: list) -> bool:
@@ -434,7 +431,6 @@ def _structure_markdown_lines(elem_texts: list) -> list:
     while i < len(elem_texts):
         typ, text = elem_texts[i]
         text_stripped = text.strip()
-        text_lower = text_stripped.lower()
 
         # Title or heading - keep as is
         if typ in ("title", "heading"):
@@ -452,9 +448,11 @@ def _structure_markdown_lines(elem_texts: list) -> list:
 
         # Table detection: collect consecutive table-like elements
         block_lines = [p.strip() for p in text_stripped.split("\n") if p.strip()]
-        if len(block_lines) >= 3 and not any(
-            ln.endswith(":") for ln in block_lines
-        ) and (_is_table_header(block_lines) or _is_table_row(block_lines)):
+        if (
+            len(block_lines) >= 3
+            and not any(ln.endswith(":") for ln in block_lines)
+            and (_is_table_header(block_lines) or _is_table_row(block_lines))
+        ):
             table_rows = []
             header_row = None
             j = i
@@ -471,11 +469,7 @@ def _structure_markdown_lines(elem_texts: list) -> list:
                         header_row = row_cells
                         j += 1
                     else:
-                        merged = (
-                            _try_merge_rows(table_rows[-1], row_cells)
-                            if table_rows
-                            else None
-                        )
+                        merged = _try_merge_rows(table_rows[-1], row_cells) if table_rows else None
                         if merged:
                             table_rows.pop()
                             table_rows.append(merged)
@@ -525,7 +519,11 @@ def _structure_markdown_lines(elem_texts: list) -> list:
                 j = 0
                 while j < len(block_lines_inner):
                     line = block_lines_inner[j]
-                    if line.endswith(":") and j + 1 < len(block_lines_inner) and len(block_lines_inner[j + 1]) < 80:
+                    if (
+                        line.endswith(":")
+                        and j + 1 < len(block_lines_inner)
+                        and len(block_lines_inner[j + 1]) < 80
+                    ):
                         formatted.append(f"**{line.rstrip(':')}** {block_lines_inner[j + 1]}")
                         j += 2
                     else:

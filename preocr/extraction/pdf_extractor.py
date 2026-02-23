@@ -343,7 +343,9 @@ def _extract_with_pdfplumber(
                     footer_fraction,
                 )
             )
-            if excluded_by_zone and (excluded_by_zone.get("header") or excluded_by_zone.get("footer")):
+            if excluded_by_zone and (
+                excluded_by_zone.get("header") or excluded_by_zone.get("footer")
+            ):
                 result.metadata["excluded_by_zone"] = excluded_by_zone
 
             # Calculate reading order (excluding footer sections)
@@ -616,16 +618,14 @@ def _extract_with_pymupdf(
                 )
 
         # Step 7: Tag zone on all elements, filter header/footer if requested
-        all_elements, all_tables, all_sections, excluded_by_zone = (
-            _tag_and_filter_header_footer(
-                all_elements,
-                all_tables,
-                all_sections,
-                exclude_header,
-                exclude_footer,
-                header_fraction,
-                footer_fraction,
-            )
+        all_elements, all_tables, all_sections, excluded_by_zone = _tag_and_filter_header_footer(
+            all_elements,
+            all_tables,
+            all_sections,
+            exclude_header,
+            exclude_footer,
+            header_fraction,
+            footer_fraction,
         )
         if excluded_by_zone and (excluded_by_zone.get("header") or excluded_by_zone.get("footer")):
             result.metadata["excluded_by_zone"] = excluded_by_zone
@@ -917,9 +917,13 @@ def _extract_tables_pymupdf_native(
 
             if include_bbox and len(table_bbox_rect) >= 4:
                 bbox = create_bbox(
-                    table_bbox_rect[0], table_bbox_rect[1],
-                    table_bbox_rect[2], table_bbox_rect[3],
-                    page_num, page_width, page_height,
+                    table_bbox_rect[0],
+                    table_bbox_rect[1],
+                    table_bbox_rect[2],
+                    table_bbox_rect[3],
+                    page_num,
+                    page_width,
+                    page_height,
                 )
             else:
                 bbox = create_bbox(0, 0, page_width, page_height, page_num, page_width, page_height)
@@ -935,14 +939,19 @@ def _extract_tables_pymupdf_native(
                         bbox.y0 + row_idx * cell_height,
                         bbox.x0 + (col_idx + 1) * cell_width,
                         bbox.y0 + (row_idx + 1) * cell_height,
-                        page_num, page_width, page_height,
+                        page_num,
+                        page_width,
+                        page_height,
                     )
                     cells.append(
                         TableCell(
-                            row=row_idx, col=col_idx,
-                            text=text or "", bbox=cell_bbox,
+                            row=row_idx,
+                            col=col_idx,
+                            text=text or "",
+                            bbox=cell_bbox,
                             confidence=0.9,
-                            rowspan=1, colspan=1,
+                            rowspan=1,
+                            colspan=1,
                         )
                     )
 
@@ -1477,12 +1486,8 @@ def _tag_and_filter_header_footer(
             )
 
     # Filter elements and tables
-    filtered_elements = [
-        e for e in elements if e.metadata.get("zone", "body") not in exclude_zones
-    ]
-    filtered_tables = [
-        t for t in tables if t.metadata.get("zone", "body") not in exclude_zones
-    ]
+    filtered_elements = [e for e in elements if e.metadata.get("zone", "body") not in exclude_zones]
+    filtered_tables = [t for t in tables if t.metadata.get("zone", "body") not in exclude_zones]
 
     # Update sections: remove element IDs that were filtered, drop empty sections
     filtered_ids = {e.element_id for e in filtered_elements} | {

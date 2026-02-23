@@ -1,11 +1,11 @@
 """Extraction validation layer with schema, integrity, and table checks."""
 
 import re
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from .schemas import Element, Table, TableCell, ExtractionResult
+from .schemas import Element, Table, TableCell
 
 SeverityType = Literal["info", "warning", "error"]
 

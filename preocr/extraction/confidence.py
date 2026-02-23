@@ -44,9 +44,7 @@ def _row_looks_like_data(cells: List[TableCell]) -> bool:
     if len(cells) < 3:
         return False
     first = (cells[0].text or "").strip()
-    return first.replace(".", "").replace("-", "").isdigit() or (
-        first and first[0].isdigit()
-    )
+    return first.replace(".", "").replace("-", "").isdigit() or (first and first[0].isdigit())
 
 
 def compute_enhanced_confidence(
@@ -103,9 +101,7 @@ def compute_enhanced_confidence(
         matching = 0
         for row_cells in rows.values():
             row_cells_sorted = sorted(row_cells, key=lambda c: c.col)
-            if _row_looks_like_header(row_cells_sorted) or _row_looks_like_data(
-                row_cells_sorted
-            ):
+            if _row_looks_like_header(row_cells_sorted) or _row_looks_like_data(row_cells_sorted):
                 matching += 1
         total_rows = len(rows)
         pattern_scores.append(matching / total_rows if total_rows else 1.0)
@@ -145,12 +141,8 @@ def compute_enhanced_confidence(
         else:
             layout_scores.append(0.7)  # Small penalty for inconsistent columns
 
-    pattern = (
-        sum(pattern_scores) / len(pattern_scores) if pattern_scores else 1.0
-    )
-    numeric = (
-        sum(numeric_scores) / len(numeric_scores) if numeric_scores else 1.0
-    )
+    pattern = sum(pattern_scores) / len(pattern_scores) if pattern_scores else 1.0
+    numeric = sum(numeric_scores) / len(numeric_scores) if numeric_scores else 1.0
     empty = sum(empty_scores) / len(empty_scores) if empty_scores else 1.0
     layout = sum(layout_scores) / len(layout_scores) if layout_scores else 1.0
 
