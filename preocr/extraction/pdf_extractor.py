@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 try:
     import pdfplumber
 except ImportError:
-    pdfplumber = None  # type: ignore[assignment]
+    pdfplumber = None
 
 try:
     import fitz  # PyMuPDF
@@ -1676,8 +1676,8 @@ def _should_stitch_tables(table1: Table, table2: Table, line_height: float = 20.
         return False
 
     # Condition 4: Vertical gap < LINE_HEIGHT * 2
-    y1_table1 = table1.bbox.y1 if hasattr(table1.bbox, "y1") else table1.bbox.get("y1", 0)  # type: ignore[attr-defined]
-    y0_table2 = table2.bbox.y0 if hasattr(table2.bbox, "y0") else table2.bbox.get("y0", 0)  # type: ignore[attr-defined]
+    y1_table1 = table1.bbox.y1 if hasattr(table1.bbox, "y1") else table1.bbox.get("y1", 0)
+    y0_table2 = table2.bbox.y0 if hasattr(table2.bbox, "y0") else table2.bbox.get("y0", 0)
     vertical_gap = abs(y0_table2 - y1_table1)
 
     if vertical_gap >= line_height * 2:

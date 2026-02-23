@@ -7,7 +7,7 @@ from typing import Optional, TypedDict
 try:
     import magic
 except ImportError:
-    magic = None  # type: ignore[assignment]
+    magic = None
 
 
 class FileTypeInfo(TypedDict):

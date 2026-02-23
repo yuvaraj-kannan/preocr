@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 try:
     import pdfplumber
 except ImportError:
-    pdfplumber = None  # type: ignore[assignment]
+    pdfplumber = None
 
 try:
     import fitz  # PyMuPDF
