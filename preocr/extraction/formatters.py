@@ -453,8 +453,8 @@ def _structure_markdown_lines(elem_texts: list) -> list:
             and not any(ln.endswith(":") for ln in block_lines)
             and (_is_table_header(block_lines) or _is_table_row(block_lines))
         ):
-            table_rows = []
-            header_row = None
+            table_rows: list[list[str]] = []
+            header_row: Optional[list[str]] = None
             j = i
             while j < len(elem_texts):
                 _, row_text = elem_texts[j]

@@ -44,7 +44,7 @@ def _row_looks_like_data(cells: List[TableCell]) -> bool:
     if len(cells) < 3:
         return False
     first = (cells[0].text or "").strip()
-    return first.replace(".", "").replace("-", "").isdigit() or (first and first[0].isdigit())
+    return first.replace(".", "").replace("-", "").isdigit() or bool(first and first[0].isdigit())
 
 
 def compute_enhanced_confidence(
