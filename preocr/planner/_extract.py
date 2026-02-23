@@ -25,22 +25,22 @@ def extract_per_page_texts(file_path: str) -> List[str]:
     """
     Extract text for each page of a PDF.
 
-    Used when caller does not provide per_page_texts. Tries pdfplumber first,
-    falls back to PyMuPDF.
+    Used when caller does not provide per_page_texts. Tries PyMuPDF first,
+    falls back to pdfplumber.
     """
     path = Path(file_path)
     if not path.exists():
         return []
 
-    if pdfplumber:
-        try:
-            return _extract_pdfplumber(path)
-        except Exception:
-            pass
-
     if fitz:
         try:
             return _extract_pymupdf(path)
+        except Exception:
+            pass
+
+    if pdfplumber:
+        try:
+            return _extract_pdfplumber(path)
         except Exception:
             pass
 

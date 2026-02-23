@@ -47,6 +47,10 @@ def extract_pdf_native_data(
     include_images: bool = True,
     include_bbox: bool = True,
     pages: Optional[List[int]] = None,
+    exclude_header: bool = False,
+    exclude_footer: bool = False,
+    header_fraction: float = 0.15,
+    footer_fraction: float = 0.15,
 ) -> ExtractionResult:
     """
     Extract structured data from PDF with element classification and confidence.
@@ -69,25 +73,7 @@ def extract_pdf_native_data(
 
     errors = []
 
-    # Try pdfplumber first (better for text and tables)
-    if pdfplumber:
-        try:
-            return _extract_with_pdfplumber(
-                path,
-                result,
-                include_tables,
-                include_forms,
-                include_metadata,
-                include_structure,
-                include_images,
-                include_bbox,
-                pages,
-            )
-        except Exception as e:
-            logger.warning(f"PDF extraction failed with pdfplumber: {e}")
-            errors.append(f"pdfplumber extraction failed: {str(e)}")
-
-    # Fallback to PyMuPDF
+    # Try PyMuPDF first (better coverage, faster - validated on lab reports)
     if fitz:
         try:
             return _extract_with_pymupdf(
@@ -100,10 +86,36 @@ def extract_pdf_native_data(
                 include_images,
                 include_bbox,
                 pages,
+                exclude_header,
+                exclude_footer,
+                header_fraction,
+                footer_fraction,
             )
         except Exception as e:
             logger.warning(f"PDF extraction failed with PyMuPDF: {e}")
             errors.append(f"pymupdf extraction failed: {str(e)}")
+
+    # Fallback to pdfplumber (better table structure for some docs)
+    if pdfplumber:
+        try:
+            return _extract_with_pdfplumber(
+                path,
+                result,
+                include_tables,
+                include_forms,
+                include_metadata,
+                include_structure,
+                include_images,
+                include_bbox,
+                pages,
+                exclude_header,
+                exclude_footer,
+                header_fraction,
+                footer_fraction,
+            )
+        except Exception as e:
+            logger.warning(f"PDF extraction failed with pdfplumber: {e}")
+            errors.append(f"pdfplumber extraction failed: {str(e)}")
 
     # Both failed
     result.errors = errors
@@ -121,6 +133,10 @@ def _extract_with_pdfplumber(
     include_images: bool,
     include_bbox: bool,
     pages: Optional[List[int]],
+    exclude_header: bool = False,
+    exclude_footer: bool = False,
+    header_fraction: float = 0.15,
+    footer_fraction: float = 0.15,
 ) -> ExtractionResult:
     """Extract using pdfplumber."""
     all_elements = []
@@ -128,6 +144,7 @@ def _extract_with_pdfplumber(
     all_forms = []
     all_images = []
     all_sections = []
+    pages_to_process: List[int] = []
     element_counter = 0
     table_counter = 0
     form_counter = 0
@@ -314,6 +331,21 @@ def _extract_with_pdfplumber(
                         f"validation: {validation['status']}"
                     )
 
+            # Step 7: Tag zone on all elements, filter header/footer if requested
+            all_elements, all_tables, all_sections, excluded_by_zone = (
+                _tag_and_filter_header_footer(
+                    all_elements,
+                    all_tables,
+                    all_sections,
+                    exclude_header,
+                    exclude_footer,
+                    header_fraction,
+                    footer_fraction,
+                )
+            )
+            if excluded_by_zone and (excluded_by_zone.get("header") or excluded_by_zone.get("footer")):
+                result.metadata["excluded_by_zone"] = excluded_by_zone
+
             # Calculate reading order (excluding footer sections)
             if include_structure:
                 reading_order = _calculate_reading_order(
@@ -325,6 +357,19 @@ def _extract_with_pdfplumber(
         logger.error(f"PDF extraction error: {e}")
         errors.append(f"Extraction error: {str(e)}")
 
+    # Validation layer (before populating result)
+    from .validation import validate_extraction
+
+    extraction_validation = validate_extraction(
+        elements=all_elements,
+        tables=all_tables,
+        reading_order=result.reading_order if include_structure else None,
+        file_path=result.file_path,
+        extraction_method=result.extraction_method,
+        pages_extracted=pages_to_process if pages else None,
+    )
+    result.metadata["extraction_validation"] = extraction_validation.model_dump()
+
     # Populate result
     result.elements = all_elements
     result.tables = all_tables
@@ -334,13 +379,16 @@ def _extract_with_pdfplumber(
     result.errors = errors
     result.pages_extracted = pages_to_process if pages else None
 
-    # Calculate overall confidence
-    result.overall_confidence = _calculate_overall_confidence(
+    # Enhanced confidence + quality metrics
+    from .confidence import compute_enhanced_confidence
+
+    overall_conf, confidence_breakdown = compute_enhanced_confidence(
         all_elements, all_tables, all_forms, all_images
     )
-
-    # Quality metrics
+    result.overall_confidence = overall_conf
     result.quality_metrics = {
+        "confidence_overall": overall_conf,
+        "confidence_breakdown": confidence_breakdown,
         "total_elements": len(all_elements),
         "total_tables": len(all_tables),
         "total_forms": len(all_forms),
@@ -362,6 +410,10 @@ def _extract_with_pymupdf(
     include_images: bool,
     include_bbox: bool,
     pages: Optional[List[int]],
+    exclude_header: bool = False,
+    exclude_footer: bool = False,
+    header_fraction: float = 0.15,
+    footer_fraction: float = 0.15,
 ) -> ExtractionResult:
     """Extract using PyMuPDF (fallback)."""
     all_elements: List[Element] = []
@@ -369,6 +421,7 @@ def _extract_with_pymupdf(
     all_forms: List[FormField] = []
     all_images: List[Element] = []
     all_sections: List[Section] = []
+    pages_to_process: List[int] = []
     element_counter = 0
     form_counter = 0
     image_counter = 0
@@ -427,6 +480,18 @@ def _extract_with_pymupdf(
                     all_forms.extend(page_forms)
                     form_counter += len(page_forms)
 
+                # Extract tables via PyMuPDF find_tables (works for bordered tables)
+                if include_tables and hasattr(page, "find_tables"):
+                    page_tables = _extract_tables_pymupdf_native(
+                        page,
+                        page_num,
+                        page_width,
+                        page_height,
+                        element_counter + form_counter,
+                        include_bbox,
+                    )
+                    all_tables.extend(page_tables)
+
                 # Extract images
                 if include_images:
                     page_images = _extract_page_images_pymupdf(
@@ -441,7 +506,11 @@ def _extract_with_pymupdf(
                     image_counter += len(page_images)
 
             except Exception as e:
-                logger.warning(f"Error processing page {page_num}: {e}")
+                err_msg = str(e).lower()
+                if "bad image name" in err_msg or "bad image" in err_msg:
+                    logger.debug(f"Page {page_num} image extraction skipped: {e}")
+                else:
+                    logger.warning(f"Error processing page {page_num}: {e}")
                 errors.append(f"Page {page_num}: {str(e)}")
 
         doc.close()
@@ -546,6 +615,21 @@ def _extract_with_pymupdf(
                     f"validation: {validation['status']}"
                 )
 
+        # Step 7: Tag zone on all elements, filter header/footer if requested
+        all_elements, all_tables, all_sections, excluded_by_zone = (
+            _tag_and_filter_header_footer(
+                all_elements,
+                all_tables,
+                all_sections,
+                exclude_header,
+                exclude_footer,
+                header_fraction,
+                footer_fraction,
+            )
+        )
+        if excluded_by_zone and (excluded_by_zone.get("header") or excluded_by_zone.get("footer")):
+            result.metadata["excluded_by_zone"] = excluded_by_zone
+
         # Calculate reading order (excluding footer sections)
         if include_structure:
             reading_order = _calculate_reading_order(
@@ -557,6 +641,19 @@ def _extract_with_pymupdf(
         logger.error(f"PDF extraction error: {e}")
         errors.append(f"Extraction error: {str(e)}")
 
+    # Validation layer (before populating result)
+    from .validation import validate_extraction
+
+    extraction_validation = validate_extraction(
+        elements=all_elements,
+        tables=all_tables,
+        reading_order=result.reading_order if include_structure else None,
+        file_path=result.file_path,
+        extraction_method=result.extraction_method,
+        pages_extracted=pages_to_process if pages else None,
+    )
+    result.metadata["extraction_validation"] = extraction_validation.model_dump()
+
     # Populate result
     result.elements = all_elements
     result.tables = all_tables
@@ -566,13 +663,16 @@ def _extract_with_pymupdf(
     result.errors = errors
     result.pages_extracted = pages_to_process if pages else None
 
-    # Calculate overall confidence
-    result.overall_confidence = _calculate_overall_confidence(
+    # Enhanced confidence + quality metrics
+    from .confidence import compute_enhanced_confidence
+
+    overall_conf, confidence_breakdown = compute_enhanced_confidence(
         all_elements, all_tables, all_forms, all_images
     )
-
-    # Quality metrics
+    result.overall_confidence = overall_conf
     result.quality_metrics = {
+        "confidence_overall": overall_conf,
+        "confidence_breakdown": confidence_breakdown,
         "total_elements": len(all_elements),
         "total_tables": len(all_tables),
         "total_forms": len(all_forms),
@@ -682,9 +782,15 @@ def _extract_page_elements_pymupdf(
     start_counter: int,
     include_bbox: bool,
 ) -> List[Element]:
-    """Extract text elements from a page using PyMuPDF."""
+    """Extract text elements from a page using PyMuPDF.
+
+    Preserves layout by:
+    - Adding space between spans when bbox gap exceeds threshold
+    - Joining lines with newlines to preserve vertical structure
+    """
     elements: List[Element] = []
     text_dict = page.get_text("dict")
+    SPAN_GAP_THRESHOLD = 2.0  # pts - add space when spans are this far apart
 
     if not text_dict or "blocks" not in text_dict:
         return elements
@@ -695,13 +801,25 @@ def _extract_page_elements_pymupdf(
 
         element_id = generate_element_id(f"elem_{start_counter + idx}")
 
-        # Extract text from lines
-        text_parts = []
+        # Extract text from lines with layout preservation
+        line_texts = []
         for line in block["lines"]:
-            for span in line.get("spans", []):
-                text_parts.append(span.get("text", ""))
-
-        text = "".join(text_parts)
+            spans = line.get("spans", [])
+            if not spans:
+                continue
+            span_parts = []
+            prev_x1 = None
+            for span in spans:
+                s_text = span.get("text", "")
+                bbox = span.get("bbox", [0, 0, 0, 0])
+                x0, x1 = bbox[0] if len(bbox) > 0 else 0, bbox[2] if len(bbox) > 2 else 0
+                # Add space if gap between previous span and this one
+                if prev_x1 is not None and x0 - prev_x1 > SPAN_GAP_THRESHOLD and s_text:
+                    span_parts.append(" ")
+                span_parts.append(s_text)
+                prev_x1 = x1
+            line_texts.append("".join(span_parts))
+        text = "\n".join(line_texts)
 
         if not text.strip():
             continue
@@ -760,6 +878,91 @@ def _extract_page_elements_pymupdf(
         elements.append(element)
 
     return elements
+
+
+def _extract_tables_pymupdf_native(
+    page: Any,
+    page_num: int,
+    page_width: float,
+    page_height: float,
+    start_counter: int,
+    include_bbox: bool,
+) -> List[Table]:
+    """Extract tables using PyMuPDF's find_tables() (best for bordered/grid tables).
+
+    For text-based tables without gridlines, find_tables often returns header-only
+    or garbled cells. We only return tables that pass a quality check.
+    """
+    tables: List[Table] = []
+    try:
+        finder = page.find_tables()
+        if not finder or not finder.tables:
+            return tables
+
+        for idx, tab in enumerate(finder.tables):
+            data = tab.extract() if hasattr(tab, "extract") else []
+            if not data or len(data) < 2:
+                continue  # Skip header-only tables
+            # Quality check: avoid garbled extractions (many tiny cells, split words)
+            total_cells = sum(len(row) for row in data)
+            non_empty = sum(1 for row in data for c in row if c and str(c).strip())
+            if total_cells > 0 and non_empty / total_cells < 0.3:
+                continue  # Too many empty cells
+            if total_cells > len(data) * 10:
+                continue  # Over-segmented (e.g. strategy=text splits words)
+
+            table_id = generate_element_id(f"table_{start_counter + idx}")
+            rows, cols = len(data), max(len(r) for r in data) if data else 0
+            table_bbox_rect = tab.bbox if hasattr(tab, "bbox") else [0, 0, page_width, page_height]
+
+            if include_bbox and len(table_bbox_rect) >= 4:
+                bbox = create_bbox(
+                    table_bbox_rect[0], table_bbox_rect[1],
+                    table_bbox_rect[2], table_bbox_rect[3],
+                    page_num, page_width, page_height,
+                )
+            else:
+                bbox = create_bbox(0, 0, page_width, page_height, page_num, page_width, page_height)
+
+            cells: List[TableCell] = []
+            for row_idx, row in enumerate(data):
+                for col_idx, cell_text in enumerate(row):
+                    text = str(cell_text or "").strip()
+                    cell_width = page_width / cols if cols > 0 else page_width
+                    cell_height = page_height / rows if rows > 0 else page_height
+                    cell_bbox = create_bbox(
+                        bbox.x0 + col_idx * cell_width,
+                        bbox.y0 + row_idx * cell_height,
+                        bbox.x0 + (col_idx + 1) * cell_width,
+                        bbox.y0 + (row_idx + 1) * cell_height,
+                        page_num, page_width, page_height,
+                    )
+                    cells.append(
+                        TableCell(
+                            row=row_idx, col=col_idx,
+                            text=text or "", bbox=cell_bbox,
+                            confidence=0.9,
+                            rowspan=1, colspan=1,
+                        )
+                    )
+
+            tables.append(
+                Table(
+                    element_id=table_id,
+                    element_type=ElementType.TABLE,
+                    page_number=page_num,
+                    bbox=bbox,
+                    rows=rows,
+                    columns=cols,
+                    cells=cells,
+                    confidence=0.9,
+                    metadata={"extraction_method": "pymupdf_find_tables"},
+                )
+            )
+    except Exception as e:
+        logger.debug(f"PyMuPDF find_tables failed: {e}")
+
+    return tables
 
 
 def _extract_page_tables(
@@ -1187,6 +1390,125 @@ def _detect_sections(
             )
 
     return sections
+
+
+def _tag_and_filter_header_footer(
+    elements: List[Element],
+    tables: List[Table],
+    sections: List[Section],
+    exclude_header: bool,
+    exclude_footer: bool,
+    header_fraction: float,
+    footer_fraction: float,
+) -> tuple:
+    """
+    Tag all elements and tables with zone (header/footer/body), then filter if requested.
+
+    Returns (filtered_elements, filtered_tables, filtered_sections, excluded_by_zone).
+    excluded_by_zone is {"header": [...], "footer": [...]} for audit traceability.
+    """
+    # Build page heights from elements and tables
+    page_heights: Dict[int, float] = {}
+    for elem in elements:
+        if elem.bbox:
+            pn = elem.bbox.page_number
+            if pn not in page_heights:
+                h = elem.bbox.layout_height or 800
+                page_heights[pn] = h
+    for table in tables:
+        if table.bbox:
+            pn = table.page_number
+            if pn not in page_heights:
+                h = table.bbox.layout_height or 800
+                page_heights[pn] = h
+
+    # Default page height if missing
+    default_height = 800
+
+    def _zone_for_bbox(bbox: Any, page_num: int) -> str:
+        ph = page_heights.get(page_num, default_height)
+        if bbox.y0 < ph * header_fraction:
+            return "header"
+        if bbox.y1 > ph * (1.0 - footer_fraction):
+            return "footer"
+        return "body"
+
+    # Tag elements
+    for elem in elements:
+        if elem.bbox:
+            zone = _zone_for_bbox(elem.bbox, elem.bbox.page_number)
+            elem.metadata["zone"] = zone
+
+    # Tag tables
+    for table in tables:
+        if table.bbox:
+            zone = _zone_for_bbox(table.bbox, table.page_number)
+            table.metadata["zone"] = zone
+
+    excluded_by_zone: Dict[str, List[Dict[str, Any]]] = {"header": [], "footer": []}
+
+    if not exclude_header and not exclude_footer:
+        return (elements, tables, sections, excluded_by_zone)
+
+    # Collect excluded items for audit trail before filtering
+    exclude_zones = []
+    if exclude_header:
+        exclude_zones.append("header")
+    if exclude_footer:
+        exclude_zones.append("footer")
+
+    for elem in elements:
+        zone = elem.metadata.get("zone", "body")
+        if zone in exclude_zones:
+            preview = (elem.text or "")[:100].strip() if elem.text else ""
+            excluded_by_zone[zone].append(
+                {"element_id": elem.element_id, "zone": zone, "text_preview": preview}
+            )
+
+    for table in tables:
+        zone = table.metadata.get("zone", "body")
+        if zone in exclude_zones:
+            excluded_by_zone[zone].append(
+                {
+                    "element_id": table.element_id,
+                    "zone": zone,
+                    "text_preview": "(table)",
+                }
+            )
+
+    # Filter elements and tables
+    filtered_elements = [
+        e for e in elements if e.metadata.get("zone", "body") not in exclude_zones
+    ]
+    filtered_tables = [
+        t for t in tables if t.metadata.get("zone", "body") not in exclude_zones
+    ]
+
+    # Update sections: remove element IDs that were filtered, drop empty sections
+    filtered_ids = {e.element_id for e in filtered_elements} | {
+        t.element_id for t in filtered_tables
+    }
+    filtered_sections: List[Section] = []
+    for sec in sections:
+        keep_elements = [eid for eid in sec.elements if eid in filtered_ids]
+        if not keep_elements:
+            continue
+        filtered_sections.append(
+            Section(
+                section_id=sec.section_id,
+                section_type=sec.section_type,
+                page_number=sec.page_number,
+                start_page=sec.start_page,
+                end_page=sec.end_page,
+                elements=keep_elements,
+                parent_section_id=sec.parent_section_id,
+                child_section_ids=sec.child_section_ids,
+                confidence=sec.confidence,
+                metadata=sec.metadata,
+            )
+        )
+
+    return (filtered_elements, filtered_tables, filtered_sections, excluded_by_zone)
 
 
 def _calculate_reading_order(

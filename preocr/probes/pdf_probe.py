@@ -51,7 +51,7 @@ def extract_pdf_text(file_path: str, page_level: bool = False) -> Dict[str, Any]
     """
     Extract text from PDF file.
 
-    Tries pdfplumber first (better text extraction), falls back to PyMuPDF.
+    Tries pdfplumber first (conservative for scanned-PDF detection), falls back to PyMuPDF.
     Even if text extraction fails, attempts to get page count from PDF structure.
 
     Args:
@@ -68,7 +68,8 @@ def extract_pdf_text(file_path: str, page_level: bool = False) -> Dict[str, Any]
     """
     path = Path(file_path)
 
-    # Try pdfplumber first
+    # Try pdfplumber first (conservative for needs_ocr: returns 0 for scanned PDFs;
+    # PyMuPDF may extract small amounts of metadata causing false digital classification)
     if pdfplumber:
         try:
             return _extract_with_pdfplumber(path, page_level)

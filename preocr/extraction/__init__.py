@@ -10,6 +10,7 @@ from .schemas import (
     Section,
     ExtractionResult,
 )
+from .validation import ValidationResult, ValidationFlag, validate_extraction
 from .base import (
     generate_element_id,
     generate_section_id,
@@ -34,6 +35,10 @@ __all__ = [
     "FormField",
     "Section",
     "ExtractionResult",
+    # Validation
+    "ValidationResult",
+    "ValidationFlag",
+    "validate_extraction",
     # Utilities
     "generate_element_id",
     "generate_section_id",

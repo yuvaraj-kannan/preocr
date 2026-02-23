@@ -28,7 +28,12 @@ def extract_native_data(
     pages: Optional[List[int]] = None,
     output_format: str = "pydantic",
     markdown_clean: Optional[bool] = None,
+    markdown_structured: bool = False,
     config: Optional[Config] = None,
+    exclude_header: bool = False,
+    exclude_footer: bool = False,
+    header_fraction: float = 0.15,
+    footer_fraction: float = 0.15,
 ) -> Union[ExtractionResult, Dict[str, Any], str]:
     """
     Extract structured data from machine-readable documents.
@@ -49,7 +54,13 @@ def extract_native_data(
         markdown_clean: If True and output_format="markdown", output only content without metadata
                         (no file paths, confidence scores, bounding boxes, etc.).
                         If None (default), automatically uses clean mode when include_metadata=False
+        markdown_structured: If True and output_format="markdown", use structured markdown
+                            (bold labels, headers, key-value pairs)
         config: Optional Config object (currently unused, reserved for future use)
+        exclude_header: If True, filter elements in header zone from result (PDF only)
+        exclude_footer: If True, filter elements in footer zone from result (PDF only)
+        header_fraction: Top fraction of page for header zone (default 0.15)
+        footer_fraction: Bottom fraction of page for footer zone (default 0.15)
 
     Returns:
         ExtractionResult (if output_format="pydantic"), Dict (if "json"), or str (if "markdown")
@@ -105,6 +116,10 @@ def extract_native_data(
             include_images=include_images,
             include_bbox=include_bbox,
             pages=pages,
+            exclude_header=exclude_header,
+            exclude_footer=exclude_footer,
+            header_fraction=header_fraction,
+            footer_fraction=footer_fraction,
         )
     elif file_type_category == "office":
         result = extract_office_native_data(
@@ -138,4 +153,5 @@ def extract_native_data(
         output_format=output_format,
         markdown_clean=markdown_clean,
         include_metadata=include_metadata,
+        markdown_structured=markdown_structured,
     )

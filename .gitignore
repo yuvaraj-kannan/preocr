@@ -82,7 +82,7 @@ dmypy.json
 test.py
 
 # Test data and results
-extraction_results/
+extracted_data/
 
 # Benchmark/validation artifacts (generated)
 scripts/benchmark_*results*.json
