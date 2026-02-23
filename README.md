@@ -802,7 +802,11 @@ See [CHANGELOG.md](docs/CHANGELOG.md) for complete version history.
 
 ### Recent Updates
 
-**v1.7.0** - Preprocess Module (Latest)
+**v1.8.0** - Formatter Simplification (Latest)
+- ✅ Heuristic-based markdown structuring; text-based table detection
+- ✅ Code cleanup, type fixes, formatting
+
+**v1.7.0** - Preprocess Module
 - ✅ **prepare_for_ocr**: Detection-aware preprocessing (denoise, deskew, otsu, rescale)
 - ✅ `steps="auto"` uses needs_ocr hints; `quality` / `fast` modes
 

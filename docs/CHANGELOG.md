@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-02-23
+
+### Changed
+- **Formatter simplification**: Heuristic-based markdown structuring only; `_structure_markdown_lines` uses text-based table detection
+- **Code cleanup**: Removed unused imports, fixed type annotations (mypy), black formatting
+
 ## [1.7.0] - 2026-02-19
 
 ### Added
@@ -412,7 +418,8 @@ if result["reason_code"] == "PDF_MIXED":
 - Comprehensive test suite
 - Documentation and examples
 
-[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/yuvaraj3855/preocr/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.8.0
 [1.7.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.7.0
 [1.6.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.6.0
 [1.5.0]: https://github.com/yuvaraj3855/preocr/releases/tag/v1.5.0
