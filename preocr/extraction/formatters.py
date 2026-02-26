@@ -1,7 +1,7 @@
 """Output formatters for extraction results."""
 
 import re
-from typing import Union, Dict, Any, Optional
+from typing import Union, Dict, Any, Optional, List
 from .schemas import ExtractionResult, Table, ElementType
 
 
@@ -11,7 +11,7 @@ def format_result(
     markdown_clean: Optional[bool] = None,
     include_metadata: bool = True,
     markdown_structured: bool = False,
-) -> Union[ExtractionResult, Dict[str, Any], str]:
+) -> Union[ExtractionResult, Dict[str, Any], Dict[str, Union[str, Dict[int, str]]]]:
     """
     Format extraction result based on output format.
 
@@ -23,7 +23,7 @@ def format_result(
         include_metadata: Whether metadata was included in extraction (affects markdown formatting)
 
     Returns:
-        Formatted result based on output_format
+        Formatted result. For markdown: Dict with "complete" (str) and "pagewise" (Dict[int, str]).
     """
     if output_format == "pydantic":
         return result
@@ -33,7 +33,9 @@ def format_result(
         # Auto-detect clean mode: if include_metadata=False, use clean mode unless explicitly set
         if markdown_clean is None:
             markdown_clean = not include_metadata
-        return format_as_markdown(result, clean=markdown_clean, structured=markdown_structured)
+        return format_as_markdown_with_pagewise(
+            result, clean=markdown_clean, structured=markdown_structured
+        )
     else:
         raise ValueError(
             f"Unknown output format: {output_format}. Use 'pydantic', 'json', or 'markdown'"
@@ -190,80 +192,151 @@ def format_as_markdown(
     return "\n".join(lines)
 
 
+def _render_page_content(
+    result: ExtractionResult,
+    page_num: int,
+    elements_by_page: Dict[int, List],
+    tables_by_page: Dict[int, List],
+    forms_by_page: Dict[int, List],
+    structured: bool = False,
+) -> str:
+    """
+    Render markdown content for a single page.
+    Used for both clean markdown and page-wise output.
+    """
+    lines: List[str] = []
+
+    # Forms for this page
+    for form in forms_by_page.get(page_num, []):
+        if form.field_name and form.value:
+            lines.append(f"**{form.field_name}:** {form.value}")
+        elif form.value:
+            lines.append(form.value)
+        lines.append("")
+
+    # Tables for this page (sort by y for doc order; skip decorative)
+    page_tables = [t for t in tables_by_page.get(page_num, []) if not t.metadata.get("is_decorative")]
+    page_tables.sort(key=lambda t: getattr(t.bbox, "y0", 0) if t.bbox else 0)
+    for table in page_tables:
+        table_md = _format_table_as_markdown(table)
+        lines.append(table_md)
+        lines.append("")
+
+    # Elements for this page
+    page_elements = elements_by_page.get(page_num, [])
+    if result.reading_order:
+        page_elements = sorted(
+            page_elements,
+            key=lambda e: (
+                result.reading_order.index(e.element_id)
+                if e.element_id in result.reading_order
+                else 9999
+            ),
+        )
+
+    elem_texts = []
+    for elem in page_elements:
+        if elem.element_type == ElementType.TITLE:
+            elem_texts.append(("title", f"# {elem.text}"))
+        elif elem.element_type == ElementType.HEADING:
+            elem_texts.append(("heading", f"## {elem.text}"))
+        elif elem.element_type == ElementType.NARRATIVE_TEXT:
+            if elem.text:
+                elem_texts.append(("narrative", elem.text))
+        elif elem.element_type == ElementType.LIST_ITEM:
+            if elem.text:
+                elem_texts.append(("list", f"- {elem.text}"))
+        elif elem.text:
+            elem_texts.append(("other", elem.text))
+
+    if structured:
+        lines.extend(_structure_markdown_lines(elem_texts))
+    else:
+        for _, text in elem_texts:
+            lines.append(text)
+            lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+def _group_content_by_page(result: ExtractionResult) -> tuple:
+    """Group elements, tables, and forms by page. Returns (elements_by_page, tables_by_page, forms_by_page)."""
+    elements_by_page: Dict[int, list] = {}
+    for elem in result.elements or []:
+        if elem.bbox:
+            pn = elem.bbox.page_number
+            if pn not in elements_by_page:
+                elements_by_page[pn] = []
+            elements_by_page[pn].append(elem)
+
+    tables_by_page: Dict[int, list] = {}
+    for table in result.tables or []:
+        pn = table.page_number
+        if pn not in tables_by_page:
+            tables_by_page[pn] = []
+        tables_by_page[pn].append(table)
+
+    forms_by_page: Dict[int, list] = {}
+    for form in result.forms or []:
+        pn = form.bbox.page_number if form.bbox else 1
+        if pn not in forms_by_page:
+            forms_by_page[pn] = []
+        forms_by_page[pn].append(form)
+
+    return elements_by_page, tables_by_page, forms_by_page
+
+
 def _format_as_clean_markdown(result: ExtractionResult, structured: bool = False) -> str:
     """
     Format result as clean markdown with only content (no metadata).
     Perfect for LLM consumption - just the text content.
 
-    Args:
-        result: ExtractionResult to format
-        structured: If True, use markdown structure (bold labels, headers, tables)
+    Output is in document order: for each page, tables and elements are interleaved
+    so content appears in reading order (fixes misordering when pages=None).
     """
-    lines = []
+    elements_by_page, tables_by_page, forms_by_page = _group_content_by_page(result)
+    all_pages = sorted(
+        set(elements_by_page.keys()) | set(tables_by_page.keys()) | set(forms_by_page.keys())
+    )
 
-    # Tables - just the table content
-    if result.tables:
-        for table in result.tables:
-            table_md = _format_table_as_markdown(table)
-            lines.append(table_md)
-            lines.append("")
+    page_contents = [
+        _render_page_content(
+            result, page_num, elements_by_page, tables_by_page, forms_by_page, structured
+        )
+        for page_num in all_pages
+    ]
+    return "\n\n".join(p for p in page_contents if p.strip()).strip()
 
-    # Forms - just field names and values
-    if result.forms:
-        for form in result.forms:
-            if form.field_name and form.value:
-                lines.append(f"**{form.field_name}:** {form.value}")
-            elif form.value:
-                lines.append(form.value)
-            lines.append("")
 
-    # Elements (text content) - main content
-    if result.elements:
-        # Group by page
-        elements_by_page: Dict[int, list] = {}
-        for elem in result.elements:
-            page_num = elem.bbox.page_number
-            if page_num not in elements_by_page:
-                elements_by_page[page_num] = []
-            elements_by_page[page_num].append(elem)
+def format_as_markdown_with_pagewise(
+    result: ExtractionResult, clean: bool = False, structured: bool = False
+) -> Dict[str, Union[str, Dict[int, str]]]:
+    """
+    Format result as markdown with both complete and page-wise output.
 
-        # Sort pages
-        for page_num in sorted(elements_by_page.keys()):
-            page_elements = elements_by_page[page_num]
+    Returns:
+        Dict with "complete" (full markdown string) and "pagewise" (Dict[page_num, markdown]).
+    """
+    elements_by_page, tables_by_page, forms_by_page = _group_content_by_page(result)
+    all_pages = sorted(
+        set(elements_by_page.keys()) | set(tables_by_page.keys()) | set(forms_by_page.keys())
+    )
+    if not all_pages:
+        return {"complete": "", "pagewise": {}}
 
-            # Sort by reading order if available
-            if result.reading_order:
-                page_elements.sort(
-                    key=lambda e: (
-                        result.reading_order.index(e.element_id)
-                        if e.element_id in result.reading_order
-                        else 9999
-                    )
-                )
+    pagewise: Dict[int, str] = {}
+    for page_num in all_pages:
+        pagewise[page_num] = _render_page_content(
+            result, page_num, elements_by_page, tables_by_page, forms_by_page, structured
+        )
 
-            elem_texts = []
-            for elem in page_elements:
-                if elem.element_type == ElementType.TITLE:
-                    elem_texts.append(("title", f"# {elem.text}"))
-                elif elem.element_type == ElementType.HEADING:
-                    elem_texts.append(("heading", f"## {elem.text}"))
-                elif elem.element_type == ElementType.NARRATIVE_TEXT:
-                    if elem.text:
-                        elem_texts.append(("narrative", elem.text))
-                elif elem.element_type == ElementType.LIST_ITEM:
-                    if elem.text:
-                        elem_texts.append(("list", f"- {elem.text}"))
-                elif elem.text:
-                    elem_texts.append(("other", elem.text))
+    if clean:
+        complete_parts = [pagewise[p] for p in all_pages]
+        complete = "\n\n".join(p for p in complete_parts if p.strip()).strip()
+    else:
+        complete = format_as_markdown(result, clean=False, structured=structured)
 
-            if structured:
-                lines.extend(_structure_markdown_lines(elem_texts))
-            else:
-                for _, text in elem_texts:
-                    lines.append(text)
-                    lines.append("")
-
-    return "\n".join(lines).strip()
+    return {"complete": complete, "pagewise": pagewise}
 
 
 def _count_numeric_cells(row: list) -> int:

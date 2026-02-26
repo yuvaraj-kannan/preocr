@@ -105,8 +105,10 @@ result = extract_native_data("invoice.pdf")
 for element in result.elements:
     print(f"{element.element_type}: {element.text}")
 
-# Export to Markdown for LLM consumption
-markdown = extract_native_data("document.pdf", output_format="markdown")
+# Export to Markdown for LLM consumption (returns complete + pagewise)
+res = extract_native_data("document.pdf", output_format="markdown")
+full_md = res["complete"]
+page_1_md = res["pagewise"][1]
 ```
 
 ### Batch Processing
@@ -166,7 +168,7 @@ Requires `pip install preocr[layout-refinement]`.
 - **Image Detection**: Locate and extract image metadata
 - **Section Detection**: Hierarchical sections with parent-child relationships
 - **Reading Order**: Logical reading order for all elements
-- **Multiple Output Formats**: Pydantic models, JSON, and Markdown (LLM-ready)
+- **Multiple Output Formats**: Pydantic models, JSON, and Markdown (LLM-ready). Markdown returns `{"complete": str, "pagewise": Dict[int, str]}` (v1.8.1)
 
 ### Advanced Features (v1.1.0+)
 
@@ -300,11 +302,13 @@ for table in result.tables:
 # JSON output
 json_data = extract_native_data("document.pdf", output_format="json")
 
-# Markdown output (LLM-ready)
-markdown = extract_native_data("document.pdf", output_format="markdown")
+# Markdown output (LLM-ready): returns {"complete": str, "pagewise": {1: str, 2: str, ...}}
+res = extract_native_data("document.pdf", output_format="markdown")
+full_md = res["complete"]
+page_1_md = res["pagewise"][1]
 
 # Clean markdown (content only, no metadata)
-clean_markdown = extract_native_data(
+res = extract_native_data(
     "document.pdf", 
     output_format="markdown",
     markdown_clean=True
@@ -658,7 +662,7 @@ Extract structured data from machine-readable documents.
 - `config` (Config): Configuration (default: None)
 
 **Returns:**
-`ExtractionResult` (Pydantic), `Dict` (JSON), or `str` (Markdown).
+`ExtractionResult` (Pydantic), `Dict` (JSON), or `Dict` with `"complete"` (str) and `"pagewise"` (Dict[int, str]) when output_format="markdown".
 
 ### `BatchProcessor(max_workers=None, use_cache=True, layout_aware=False, page_level=True, extensions=None, config=None)`
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-02-26
+
+### Fixed
+- **Markdown output ordering**: When `pages=None`, tables were output before all elements, causing content from later pages (e.g., reference tables) to appear at the top. Output is now emitted page-by-page in document order.
+
+### Added
+- **Page-wise markdown**: When `output_format="markdown"`, the function now returns `{"complete": str, "pagewise": Dict[int, str]}` instead of a single string. Use `res["complete"]` for the full markdown and `res["pagewise"][n]` for page n.
+
+### Breaking
+- **Markdown return type**: `extract_native_data(..., output_format="markdown")` now returns a dict. Update code from `markdown = extract_native_data(...)` to `res = extract_native_data(...); full_md = res["complete"]`.
+
 ## [1.8.0] - 2026-02-23
 
 ### Changed

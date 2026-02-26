@@ -34,7 +34,7 @@ def extract_native_data(
     exclude_footer: bool = False,
     header_fraction: float = 0.15,
     footer_fraction: float = 0.15,
-) -> Union[ExtractionResult, Dict[str, Any], str]:
+) -> Union[ExtractionResult, Dict[str, Any], Dict[str, Union[str, Dict[int, str]]]]:
     """
     Extract structured data from machine-readable documents.
 
@@ -63,7 +63,8 @@ def extract_native_data(
         footer_fraction: Bottom fraction of page for footer zone (default 0.15)
 
     Returns:
-        ExtractionResult (if output_format="pydantic"), Dict (if "json"), or str (if "markdown")
+        ExtractionResult (if output_format="pydantic"), Dict (if "json"), or Dict with
+        "complete" (str) and "pagewise" (Dict[int, str]) when output_format="markdown".
 
     Example:
         >>> from preocr import extract_native_data
@@ -75,11 +76,10 @@ def extract_native_data(
         >>> # Extract specific pages as JSON
         >>> json_data = extract_native_data("document.pdf", pages=[1, 2], output_format="json")
         >>>
-        >>> # Extract as markdown for LLM consumption (with metadata)
-        >>> markdown = extract_native_data("document.pdf", output_format="markdown")
-        >>>
-        >>> # Extract as clean markdown (content only, no metadata)
-        >>> clean_markdown = extract_native_data("document.pdf", output_format="markdown", markdown_clean=True)
+        >>> # Extract as markdown: returns {"complete": str, "pagewise": {1: str, 2: str, ...}}
+        >>> res = extract_native_data("document.pdf", output_format="markdown")
+        >>> full_md = res["complete"]
+        >>> page_1_md = res["pagewise"][1]
     """
     path = Path(file_path)
 
