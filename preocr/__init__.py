@@ -15,6 +15,7 @@ from .core import decision, detector, signals, extractor
 from . import preprocess
 from .probes import image_probe, office_probe, pdf_probe, text_probe
 from .utils import batch, cache, filetype, logger
+from .reporting import generate_html_report, ReportConfig
 
 # Export Config for easy access
 Config = constants.Config
@@ -31,6 +32,8 @@ __all__ = [
     "BatchResults",
     "Config",
     "PreprocessConfig",
+    "generate_html_report",
+    "ReportConfig",
     # Modules (for backward compatibility)
     "constants",
     "exceptions",
@@ -51,4 +54,5 @@ __all__ = [
     "office_probe",
     "pdf_probe",
     "text_probe",
+    "reporting",
 ]

@@ -198,6 +198,153 @@ class Config:
                 "ocr_score_low_band_max <= ocr_decision_threshold <= ocr_score_high_band_min"
             )
 
+    @classmethod
+    def for_scanned_documents(cls) -> "Config":
+        """
+        Config preset for domains with mostly scanned documents.
+        
+        Optimizes for:
+        - Higher OCR detection rate (low threshold)
+        - Strict digital criteria (high bar to skip OCR)
+        - Good for: medical PDFs, legal documents, historical scans
+        
+        Use when: Your document mix is 60%+ scanned/image-heavy
+        
+        Returns:
+            Config optimized for scanned document detection
+        """
+        return cls(
+            min_text_length=50,  # Stricter text requirement
+            min_office_text_length=150,  # Office docs need more text
+            ocr_score_low_band_max=0.25,  # Lower threshold for "needs OCR" band
+            ocr_score_high_band_min=0.65,  # Aggressive OCR detection
+            ocr_decision_threshold=0.45,  # Favor OCR decision
+            # Digital bias: harder to satisfy (requires high text + low images)
+            digital_bias_text_coverage_min=75.0,  # Strict: 75% text minimum
+            digital_bias_image_coverage_max=20.0,  # Strict: max 20% images
+            # Skip OpenCV to save compute (scans are obvious)
+            skip_opencv_if_file_size_mb=50.0,
+            skip_opencv_if_page_count=100,
+        )
+
+    @classmethod
+    def for_cost_optimization(cls) -> "Config":
+        """
+        Config preset for aggressive OCR skipping to minimize costs.
+        
+        Optimizes for:
+        - Maximize digital PDF detection (skip more OCR runs)
+        - Lower confidence thresholds (faster decisions)
+        - Good for: high-volume batch processing, e-commerce, SaaS workflows
+        
+        Use when: Your primary goal is cost reduction, tolerate some false negatives
+        
+        Returns:
+            Config optimized for cost savings
+        """
+        return cls(
+            min_text_length=20,  # Very lenient text requirement
+            min_office_text_length=50,  # Office docs: bare minimum
+            ocr_score_low_band_max=0.40,  # Generous "digital" band
+            ocr_score_high_band_min=0.75,  # High threshold for OCR
+            ocr_decision_threshold=0.55,  # Favor skipping OCR
+            # Aggressive digital bias
+            digital_bias_text_coverage_min=50.0,
+            digital_bias_image_coverage_max=70.0,
+            # Skip layout analysis on larger files
+            skip_opencv_if_file_size_mb=20.0,
+            skip_opencv_if_page_count=50,
+            confidence_light_refinement_min=0.40,  # Skip heavy refinement
+        )
+
+    @classmethod
+    def for_tables_and_forms(cls) -> "Config":
+        """
+        Config preset for structured data extraction (tables, forms, fields).
+        
+        Optimizes for:
+        - Conservative OCR detection (high bar to skip OCR)
+        - Table/form-aware decision logic
+        - Good for: financial reports, tax forms, invoices, data extraction
+        
+        Use when: You need tables/forms extracted accurately; false negatives are worse than false positives
+        
+        Returns:
+            Config optimized for structured data preservation
+        """
+        return cls(
+            min_text_length=100,  # Conservative: need real content
+            min_office_text_length=200,  # Office docs: substantial content
+            ocr_score_low_band_max=0.20,  # Low "confident digital" band
+            ocr_score_high_band_min=0.60,  # Lower threshold, favor OCR
+            ocr_decision_threshold=0.40,  # Aggressive OCR detection
+            # Strict digital bias for tables
+            digital_bias_text_coverage_min=80.0,
+            digital_bias_image_coverage_max=10.0,
+            # Enable table bias to detect tables/forms
+            table_bias_text_density_min=1.5,
+            table_bias_text_coverage_min=50.0,
+            # Always run layout analysis for accuracy
+            skip_opencv_if_file_size_mb=None,
+            confidence_light_refinement_min=0.0,  # Always refine
+        )
+
+    @classmethod
+    def for_mixed_content(cls) -> "Config":
+        """
+        Config preset for balanced processing of mixed document types.
+        
+        Optimizes for:
+        - Balanced OCR/no-OCR decisions
+        - Moderate refinement (balance speed and accuracy)
+        - Good for: general document pipelines, unknown mixed sources
+        
+        Use when: You don't know your document distribution in advance
+        
+        Returns:
+            Config with balanced thresholds
+        """
+        return cls(
+            min_text_length=75,
+            min_office_text_length=125,
+            ocr_score_low_band_max=0.30,
+            ocr_score_high_band_min=0.70,
+            ocr_decision_threshold=0.50,  # Default middle ground
+            digital_bias_text_coverage_min=65.0,
+            digital_bias_image_coverage_max=50.0,
+            skip_opencv_if_file_size_mb=100.0,
+            skip_opencv_if_page_count=200,
+        )
+
+    @classmethod
+    def high_precision(cls) -> "Config":
+        """
+        Config preset for maximum accuracy (slower, higher confidence thresholds).
+        
+        Optimizes for:
+        - High confidence in every decision
+        - Full layout/OpenCV analysis always
+        - Good for: critical documents, compliance, validation workflows
+        
+        Use when: Accuracy matters more than speed; cost isn't a concern
+        
+        Returns:
+            Config prioritizing decision quality over speed
+        """
+        return cls(
+            min_text_length=150,
+            min_office_text_length=250,
+            confidence_exit_threshold=0.95,  # Only exit on very high confidence
+            confidence_light_refinement_min=0.60,  # Always refine if below 0.60
+            ocr_score_low_band_max=0.20,
+            ocr_score_high_band_min=0.80,  # High bar for both decisions
+            ocr_decision_threshold=0.50,
+            skip_opencv_if_file_size_mb=None,  # Never skip layout analysis
+            skip_opencv_if_page_count=None,
+            digital_bias_text_coverage_min=85.0,  # Very high bar
+            digital_bias_image_coverage_max=5.0,
+        )
+
 
 # Reason codes for structured decision tracking
 class ReasonCode:
