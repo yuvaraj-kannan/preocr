@@ -10,8 +10,79 @@ Config = constants.Config
 ReasonCode = constants.ReasonCode
 get_reason_description = reason_codes.get_reason_description
 
-# Default config instance for backward compatibility
 _DEFAULT_CONFIG = Config()
+
+
+# ─────────────────────────────────────────────
+# CHANGE 1: Direct ocr_score formula
+# Before:  digital_score = ... ; ocr_score = 1 - digital_score
+# After:   ocr_score computed directly — easier to reason about
+# ─────────────────────────────────────────────
+def _calculate_ocr_score_from_signals(
+    signals: Dict[str, Any],
+    text_coverage: float,
+    image_coverage: float,
+    config: Optional[Config] = None,
+) -> float:
+    """
+    Calculate OCR_SCORE using direct weighted scoring model.
+
+    Returns score 0–1 where:
+        0 = confidently digital
+        1 = confidently scanned
+
+    Components (all normalized to [0, 1]):
+        image_norm   ↑  → scanned (image-heavy)
+        noise_norm   ↑  → scanned (bad text layer)
+        text_norm    ↓  → scanned (little extractable text)
+        font_norm    ↓  → scanned (no embedded fonts)
+    """
+    if config is None:
+        config = _DEFAULT_CONFIG
+
+    # Raw signals
+    text_length = int(signals.get("text_length", 0) or 0)
+    non_printable = float(signals.get("non_printable_ratio", 0.0) or 0.0)
+    unicode_noise = float(signals.get("unicode_noise_ratio", 0.0) or 0.0)
+    font_count = signals.get("font_count")
+    font_count_int = int(font_count) if isinstance(font_count, int) and font_count >= 0 else 0
+
+    # Normalize to [0, 1]
+    text_norm = min(text_length / 200.0, 1.0) if text_length > 0 else 0.0
+    image_norm = max(0.0, min(image_coverage / 100.0, 1.0)) if image_coverage > 0 else 0.0
+    noise_raw = (
+        (non_printable + unicode_noise) / 2.0 if (non_printable > 0 or unicode_noise > 0) else 0.0
+    )
+    noise_norm = max(0.0, min(noise_raw, 1.0))
+    font_norm = max(0.0, min(font_count_int / 5.0, 1.0)) if font_count_int > 0 else 0.0
+
+    # Weights
+    text_w = config.ocr_score_text_weight if config.ocr_score_text_weight is not None else 0.35
+    image_w = config.ocr_score_image_weight if config.ocr_score_image_weight is not None else 0.35
+    noise_w = config.ocr_score_noise_weight if config.ocr_score_noise_weight is not None else 0.20
+    font_w = config.ocr_score_font_weight if config.ocr_score_font_weight is not None else 0.10
+
+    # CHANGE 1: Direct formula — high image/noise and low text/fonts → high ocr_score
+    ocr_score = (
+        image_w * image_norm
+        + noise_w * noise_norm
+        + text_w * (1.0 - text_norm)
+        + font_w * (1.0 - font_norm)
+    )
+    ocr_score = round(max(0.0, min(ocr_score, 1.0)), 3)
+
+    # Debug breakdown
+    if signals.get("_debug_scoring"):
+        signals["_debug_scoring"]["components"] = {
+            "text_norm": text_norm,
+            "image_norm": image_norm,
+            "noise_norm": noise_norm,
+            "font_norm": font_norm,
+            "weights": {"text": text_w, "image": image_w, "noise": noise_w, "font": font_w},
+            "ocr_score": ocr_score,
+        }
+
+    return ocr_score
 
 
 def calculate_ocr_score(
@@ -20,50 +91,117 @@ def calculate_ocr_score(
     text_coverage: float,
     config: Optional[Config] = None,
 ) -> float:
+    """Backward-compatible public wrapper."""
+    signals: Dict[str, Any] = {
+        "text_length": text_length,
+        "image_coverage": image_coverage,
+        "text_coverage": text_coverage,
+    }
+    return _calculate_ocr_score_from_signals(signals, text_coverage, image_coverage, config)
+
+
+# ─────────────────────────────────────────────
+# CHANGE 3: Shared bias helpers
+# Extracted from decide() and refine_with_opencv() to eliminate duplication.
+# ─────────────────────────────────────────────
+def _check_digital_bias(
+    text_coverage: float,
+    image_coverage: float,
+    text_length: int,
+    ocr_score: float,
+    signals: Dict[str, Any],
+    config: Config,
+) -> Optional[Tuple[bool, str, float, str, str]]:
     """
-    Calculate OCR_SCORE using pixel-aware scoring model.
-
-    OCR_SCORE = 0.35 * image_ratio + 0.25 * (1 - alphabet_ratio) +
-                0.2 * low_text_density + 0.2 * font_suspicion
-
-    Args:
-        text_length: Length of extracted text
-        image_coverage: Image coverage percentage (0-100)
-        text_coverage: Text coverage percentage (0-100)
-        config: Optional Config object
-
-    Returns:
-        OCR_SCORE (0.0-1.0) where higher score indicates more likely to need OCR
+    Digital bias: high text + moderate images → digital.
+    Returns a decision tuple if bias fires, else None.
     """
-    if config is None:
-        config = _DEFAULT_CONFIG
+    tc_min = config.digital_bias_text_coverage_min
+    ic_max = config.digital_bias_image_coverage_max
+    if (
+        tc_min is not None
+        and ic_max is not None
+        and text_coverage >= tc_min
+        and image_coverage <= ic_max
+        and text_length >= config.min_text_length
+    ):
+        confidence = calculate_confidence_from_signals(
+            signals, needs_ocr=False, ocr_score=ocr_score, config=config
+        )
+        confidence = max(confidence, 0.85)
+        return (
+            False,
+            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+            f"(high text coverage {text_coverage:.1f}%, digital bias)",
+            confidence,
+            CATEGORY_STRUCTURED,
+            ReasonCode.PDF_DIGITAL,
+        )
+    return None
 
-    # Calculate image_ratio from image_coverage (convert percentage to ratio)
+
+def _check_hybrid_scan(
+    image_coverage: float,
+    text_length: int,
+    ocr_score: float,
+    signals: Dict[str, Any],
+    config: Config,
+) -> Optional[Tuple[bool, str, float, str, str]]:
+    """
+    Hybrid rule: image_ratio > 0.75 AND text_length < 30 → scanned.
+    Returns a decision tuple if rule fires, else None.
+    """
     image_ratio = image_coverage / 100.0 if image_coverage > 0 else 0.0
-    image_weight = (
-        config.ocr_score_image_weight if config.ocr_score_image_weight is not None else 0.35
-    )
+    if image_ratio > 0.75 and text_length < 30:
+        confidence = calculate_confidence_from_signals(
+            signals, needs_ocr=True, ocr_score=ocr_score, config=config
+        )
+        confidence = max(confidence, 0.90)
+        return (
+            True,
+            f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+            f"(hybrid rule: {image_coverage:.1f}% images, {text_length} chars)",
+            confidence,
+            CATEGORY_UNSTRUCTURED,
+            ReasonCode.PDF_SCANNED,
+        )
+    return None
 
-    # Approximate alphabet_ratio (normalized text length factor)
-    max_expected_text = 10000  # Reasonable max for a page
-    alphabet_ratio = min(text_length / max_expected_text, 1.0) if text_length > 0 else 0.0
 
-    # Calculate low_text_density (inverse of text_coverage, normalized)
-    text_density_val = text_coverage / 100.0 if text_coverage > 0 else 0.0
-    low_text_density = 1.0 - min(text_density_val, 1.0)
-
-    # Font suspicion: higher when text_length is very low
-    font_suspicion = 1.0 - min(text_length / 50.0, 1.0) if text_length < 50 else 0.0
-
-    # Calculate OCR score (image_weight configurable for generic/financial PDFs)
-    ocr_score = (
-        image_weight * image_ratio
-        + 0.25 * (1.0 - alphabet_ratio)
-        + 0.20 * low_text_density
-        + 0.20 * font_suspicion
-    )
-
-    return round(ocr_score, 3)
+def _check_table_bias(
+    text_coverage: float,
+    text_length: int,
+    ocr_score: float,
+    signals: Dict[str, Any],
+    config: Config,
+) -> Optional[Tuple[bool, str, float, str, str]]:
+    """
+    Table bias: mixed layout with high text density → digital (tables, not scans).
+    Returns a decision tuple if bias fires, else None.
+    """
+    td_min = config.table_bias_text_density_min
+    tc_min = config.table_bias_text_coverage_min
+    text_density = signals.get("text_density", 0.0)
+    if (
+        td_min is not None
+        and tc_min is not None
+        and text_density >= td_min
+        and text_coverage >= tc_min
+        and text_length >= config.min_text_length
+    ):
+        confidence = calculate_confidence_from_signals(
+            signals, needs_ocr=False, ocr_score=ocr_score, config=config
+        )
+        confidence = max(confidence, 0.80)
+        return (
+            False,
+            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+            f"(mixed layout, high text density {text_density:.1f}, table bias)",
+            confidence,
+            CATEGORY_STRUCTURED,
+            ReasonCode.PDF_DIGITAL,
+        )
+    return None
 
 
 def calculate_confidence_from_signals(
@@ -72,66 +210,39 @@ def calculate_confidence_from_signals(
     ocr_score: Optional[float] = None,
     config: Optional[Config] = None,
 ) -> float:
-    """
-    Calculate confidence score from signals using unified approach.
-
-    Priority:
-    1. Use OCR_SCORE if available (most accurate)
-    2. Use layout-based calculation
-    3. Fallback to text-length based
-
-    Args:
-        signals: Dictionary of signals from signals.collect_signals()
-        needs_ocr: Boolean indicating if OCR is needed
-        ocr_score: Optional OCR_SCORE (0.0-1.0) if already calculated
-        config: Optional Config object
-
-    Returns:
-        Confidence score (0.0-1.0)
-    """
+    """Calculate confidence score from signals. Unchanged from original."""
     if config is None:
         config = _DEFAULT_CONFIG
 
-    # Priority 1: Use OCR_SCORE if available (most accurate)
     if ocr_score is not None and config.use_ocr_score_confidence:
-        # Calibrate OCR_SCORE to confidence range (0.50-0.95)
         if needs_ocr:
-            # Higher OCR_SCORE = higher confidence for "needs OCR"
-            confidence = 0.50 + (ocr_score * 0.45)  # Range: 0.50-0.95
+            confidence = 0.50 + (ocr_score * 0.45)
         else:
-            # Lower OCR_SCORE = higher confidence for "no OCR"
-            confidence = 0.50 + ((1.0 - ocr_score) * 0.45)  # Range: 0.50-0.95
+            confidence = 0.50 + ((1.0 - ocr_score) * 0.45)
         return round(confidence, 2)
 
-    # Priority 2: Layout-based (if layout data available)
     layout_type = signals.get("layout_type")
     if layout_type and layout_type != "unknown":
         text_coverage = float(signals.get("text_coverage", 0.0))
         image_coverage = float(signals.get("image_coverage", 0.0))
-
         if needs_ocr:
-            # More images = higher confidence
             image_factor = min(image_coverage / 100.0, 1.0)
-            confidence = 0.60 + (image_factor * 0.30)  # Range: 0.60-0.90
+            confidence = 0.60 + (image_factor * 0.30)
         else:
-            # More text = higher confidence
             text_factor = min(text_coverage / 100.0, 1.0)
-            confidence = 0.70 + (text_factor * 0.25)  # Range: 0.70-0.95
+            confidence = 0.70 + (text_factor * 0.25)
         return round(confidence, 2)
 
-    # Priority 3: Text-length based fallback
     text_length = signals.get("text_length", 0)
     if needs_ocr:
-        # Less text = higher confidence (scanned)
         if text_length == 0:
-            confidence = 0.65  # High confidence for no text
+            confidence = 0.65
         else:
             proximity = min(text_length / config.min_text_length, 1.0)
-            confidence = 0.55 + ((1.0 - proximity) * 0.20)  # Range: 0.55-0.75
+            confidence = 0.55 + ((1.0 - proximity) * 0.20)
     else:
-        # More text = higher confidence (digital)
         text_factor = min(text_length / 1000.0, 1.0)
-        confidence = 0.75 + (text_factor * 0.20)  # Range: 0.75-0.95
+        confidence = 0.75 + (text_factor * 0.20)
 
     return round(confidence, 2)
 
@@ -141,18 +252,6 @@ def decide(
 ) -> Tuple[bool, str, float, str, str]:
     """
     Decide if a file needs OCR based on collected signals.
-
-    Args:
-        signals: Dictionary of signals from signals.collect_signals()
-        config: Optional Config object with threshold settings. If None, uses default thresholds.
-
-    Returns:
-        Tuple of:
-            - needs_ocr: Boolean indicating if OCR is needed
-            - reason: Human-readable reason for the decision
-            - confidence: Confidence score (0.0-1.0)
-            - category: "structured" or "unstructured"
-            - reason_code: Structured reason code (e.g., "PDF_DIGITAL", "IMAGE_FILE")
     """
     if config is None:
         config = _DEFAULT_CONFIG
@@ -162,7 +261,7 @@ def decide(
     extension = signals.get("extension", "")
     is_binary = signals.get("is_binary", True)
 
-    # Rule 1: Plain text formats - NO OCR
+    # Rule 1: Plain text — no OCR
     if mime.startswith("text/"):
         return (
             False,
@@ -172,7 +271,7 @@ def decide(
             ReasonCode.TEXT_FILE,
         )
 
-    # Rule 2: Office documents with text - NO OCR
+    # Rule 2: Office documents
     if "officedocument" in mime or extension in ["docx", "pptx", "xlsx"]:
         if text_length >= config.min_office_text_length:
             return (
@@ -182,16 +281,15 @@ def decide(
                 CATEGORY_STRUCTURED,
                 ReasonCode.OFFICE_WITH_TEXT,
             )
-        else:
-            return (
-                True,
-                f"{get_reason_description(ReasonCode.OFFICE_NO_TEXT)} ({text_length} chars)",
-                config.medium_confidence,
-                CATEGORY_UNSTRUCTURED,
-                ReasonCode.OFFICE_NO_TEXT,
-            )
+        return (
+            True,
+            f"{get_reason_description(ReasonCode.OFFICE_NO_TEXT)} ({text_length} chars)",
+            config.medium_confidence,
+            CATEGORY_UNSTRUCTURED,
+            ReasonCode.OFFICE_NO_TEXT,
+        )
 
-    # Rule 3: Images - YES OCR (always)
+    # Rule 3: Images — always OCR
     if mime.startswith("image/"):
         return (
             True,
@@ -201,280 +299,256 @@ def decide(
             ReasonCode.IMAGE_FILE,
         )
 
-    # Rule 4: PDFs (with optional layout-aware analysis)
+    # Rule 4: PDFs
     if mime == "application/pdf" or extension == "pdf":
-        # 1. Hard Digital Check (defensive fallback - detector may have already exited)
+
+        # ── Hard Digital guard ──────────────────────────────────────────────
         if text_length >= config.hard_digital_text_threshold:
             return (
                 False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (hard digital: {text_length} chars extractable)",
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                f"(hard digital: {text_length} chars extractable)",
                 config.high_confidence,
                 CATEGORY_STRUCTURED,
                 ReasonCode.PDF_DIGITAL,
             )
 
-        # Check if layout analysis is available
+        # ── Resolve effective coverage values ───────────────────────────────
         layout_type = signals.get("layout_type")
         is_mixed_content = signals.get("is_mixed_content", False)
         text_coverage = signals.get("text_coverage", 0.0)
         image_coverage = signals.get("image_coverage", 0.0)
-
-        # Calculate image_ratio from image_coverage (convert percentage to ratio)
-        # Also check OpenCV results if available (more accurate for scanned PDFs)
         opencv_layout = signals.get("opencv_layout", {})
         image_coverage_opencv = opencv_layout.get("image_coverage", 0.0) if opencv_layout else 0.0
         text_coverage_opencv = opencv_layout.get("text_coverage", 0.0) if opencv_layout else 0.0
-
-        # Use OpenCV coverage if available (more accurate), otherwise use layout analyzer
         effective_image_coverage = (
             image_coverage_opencv if image_coverage_opencv > 0 else image_coverage
         )
         effective_text_coverage = (
             text_coverage_opencv if text_coverage_opencv > 0 else text_coverage
         )
-        image_ratio = effective_image_coverage / 100.0 if effective_image_coverage > 0 else 0.0
 
-        # 2a. Digital-but-low-quality: text layer exists but is broken/invisible (garbage)
-        # High noise ratio → treat as scan to prevent false negatives
-        non_printable = signals.get("non_printable_ratio", 0.0)
-        unicode_noise = signals.get("unicode_noise_ratio", 0.0)
-        if (non_printable > 0.05 or unicode_noise > 0.08) and text_length > 0:
-            confidence = calculate_confidence_from_signals(
-                signals, needs_ocr=True, ocr_score=None, config=config
-            )
-            return (
-                True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (low-quality text layer: non_printable={non_printable*100:.1f}%, unicode_noise={unicode_noise*100:.1f}%)",
-                max(confidence, 0.75),
-                CATEGORY_UNSTRUCTURED,
-                ReasonCode.PDF_SCANNED,
-            )
+        # CHANGE 2: Compute ocr_score EARLY so all guards can use it
+        ocr_score = _calculate_ocr_score_from_signals(
+            signals, effective_text_coverage, effective_image_coverage, config
+        )
 
-        # 2b. Font count signal: font_count == 0 is strong scan indicator (scanned PDFs often
-        # have no embedded fonts; some embed invisible garbage text, so text_length can lie)
-        font_count = signals.get("font_count")
-        if font_count is not None and font_count == 0 and text_length < config.hard_scan_text_max:
-            return (
-                True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (no embedded fonts, {text_length} chars - strong scan signal)",
-                config.high_confidence,
-                CATEGORY_UNSTRUCTURED,
-                ReasonCode.PDF_SCANNED,
-            )
-
-        # 2c. Hard Scan Check - image_coverage >= 80% AND text_length < 20 → OCR
+        # ── Hard Scan guard ─────────────────────────────────────────────────
         if (
             effective_image_coverage >= config.hard_scan_image_coverage_min
             and text_length < config.hard_scan_text_max
         ):
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hard scan: {effective_image_coverage:.1f}% images, {text_length} chars)",
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                f"(hard scan: {effective_image_coverage:.1f}% images, {text_length} chars)",
                 config.high_confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
 
-        # Calculate OCR_SCORE for unified confidence calculation
-        ocr_score = None
-        if layout_type and layout_type != "unknown":
-            ocr_score = calculate_ocr_score(
-                text_length, effective_image_coverage, text_coverage, config
-            )
-
-        # 3. Digital bias: high text + moderate image = digital (protects product/manual PDFs)
-        tc_min = config.digital_bias_text_coverage_min
-        ic_max = config.digital_bias_image_coverage_max
-        if (
-            tc_min is not None
-            and ic_max is not None
-            and effective_text_coverage >= tc_min
-            and effective_image_coverage <= ic_max
-            and text_length >= config.min_text_length
-        ):
-            confidence = calculate_confidence_from_signals(
-                signals, needs_ocr=False, ocr_score=ocr_score, config=config
-            )
-            confidence = max(confidence, 0.85)
-            return (
-                False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (high text coverage {effective_text_coverage:.1f}%, digital bias)",
-                confidence,
-                CATEGORY_STRUCTURED,
-                ReasonCode.PDF_DIGITAL,
-            )
-
-        # 🔥 Hybrid Rule: Sweet spot for OCR detection
-        # If image_ratio > 0.75 AND extracted_text_length < 30 → OCR
-        # This catches scanned PDFs that are image-heavy with minimal extractable text
-        if image_ratio > 0.75 and text_length < 30:
-            # Use unified confidence calculation
-            confidence = calculate_confidence_from_signals(
-                signals, needs_ocr=True, ocr_score=ocr_score, config=config
-            )
-            # Ensure high confidence for hybrid rule (override if needed)
-            confidence = max(confidence, 0.90)
+        # ── Font-count guard ────────────────────────────────────────────────
+        font_count = signals.get("font_count")
+        if font_count is not None and font_count == 0 and text_length < config.hard_scan_text_max:
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hybrid rule: {effective_image_coverage:.1f}% images, {text_length} chars)",
-                confidence,
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                f"(no embedded fonts, {text_length} chars - strong scan signal)",
+                config.high_confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
 
-        # Alternative: If text_length is very low (< 30) and we have layout data suggesting images
-        # This handles cases where scanned PDFs aren't detected as images but have no text
+        # CHANGE 4: Noise guard — only fires when score ALSO agrees
+        # Replaces the old hard exit; avoids silencing the score for mildly noisy digital PDFs.
+        non_printable = signals.get("non_printable_ratio", 0.0)
+        unicode_noise = signals.get("unicode_noise_ratio", 0.0)
+        if (
+            (non_printable > 0.05 or unicode_noise > 0.08)
+            and text_length > 0
+            and ocr_score > 0.6  # score must also lean scanned
+        ):
+            confidence = calculate_confidence_from_signals(
+                signals, needs_ocr=True, ocr_score=ocr_score, config=config
+            )
+            return (
+                True,
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                f"(low-quality text layer: non_printable={non_printable*100:.1f}%, "
+                f"unicode_noise={unicode_noise*100:.1f}%, ocr_score={ocr_score:.2f})",
+                max(confidence, 0.75),
+                CATEGORY_UNSTRUCTURED,
+                ReasonCode.PDF_SCANNED,
+            )
+
+        # CHANGE 3: Use shared bias helpers instead of inline duplicates
+        result = _check_digital_bias(
+            effective_text_coverage,
+            effective_image_coverage,
+            text_length,
+            ocr_score,
+            signals,
+            config,
+        )
+        if result:
+            return result
+
+        result = _check_hybrid_scan(
+            effective_image_coverage, text_length, ocr_score, signals, config
+        )
+        if result:
+            return result
+
+        # Low text + image-heavy (layout-aware fallback)
         if text_length < 30 and layout_type and layout_type != "unknown":
-            # Check if layout suggests image-heavy content
             if image_coverage > 50.0 or (is_mixed_content and image_coverage > text_coverage):
                 confidence = calculate_confidence_from_signals(
                     signals, needs_ocr=True, ocr_score=ocr_score, config=config
                 )
                 return (
                     True,
-                    f"{get_reason_description(ReasonCode.PDF_SCANNED)} (low text + high image content: {text_length} chars, {image_coverage:.1f}% images)",
+                    f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                    f"(low text + high image content: {text_length} chars, "
+                    f"{image_coverage:.1f}% images)",
                     confidence,
                     CATEGORY_UNSTRUCTURED,
                     ReasonCode.PDF_SCANNED,
                 )
 
-        # Layout-aware decision (if layout analysis was performed)
+        # ── Layout-aware decisions ──────────────────────────────────────────
         if layout_type and layout_type != "unknown":
-            # Mixed content: has both text and images
             if is_mixed_content:
-                # Table bias: mixed layout with high text density = tables/digital, not scanned
-                td_min = config.table_bias_text_density_min
-                tc_min_table = config.table_bias_text_coverage_min
-                text_density = signals.get("text_density", 0.0)
-                if (
-                    td_min is not None
-                    and tc_min_table is not None
-                    and text_density >= td_min
-                    and effective_text_coverage >= tc_min_table
-                    and text_length >= config.min_text_length
-                ):
-                    confidence = calculate_confidence_from_signals(
-                        signals, needs_ocr=False, ocr_score=ocr_score, config=config
-                    )
-                    confidence = max(confidence, 0.80)
-                    return (
-                        False,
-                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (mixed layout, high text density {text_density:.1f}, table bias)",
-                        confidence,
-                        CATEGORY_STRUCTURED,
-                        ReasonCode.PDF_DIGITAL,
-                    )
+                # CHANGE 3: shared table bias helper
+                result = _check_table_bias(
+                    effective_text_coverage, text_length, ocr_score, signals, config
+                )
+                if result:
+                    return result
 
-                # If text coverage is significant, might not need full OCR
                 if text_length >= config.min_text_length and text_coverage > 10:
                     confidence = calculate_confidence_from_signals(
                         signals, needs_ocr=False, ocr_score=ocr_score, config=config
                     )
                     return (
                         False,
-                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (mixed content, {text_length} chars, {text_coverage:.1f}% text coverage)",
+                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                        f"(mixed content, {text_length} chars, "
+                        f"{text_coverage:.1f}% text coverage)",
                         confidence,
                         CATEGORY_STRUCTURED,
                         ReasonCode.PDF_DIGITAL,
                     )
                 else:
-                    # Mixed but text is sparse - needs OCR for images
                     confidence = calculate_confidence_from_signals(
                         signals, needs_ocr=True, ocr_score=ocr_score, config=config
                     )
                     return (
                         True,
-                        f"{get_reason_description(ReasonCode.PDF_MIXED)} ({text_length} chars, {image_coverage:.1f}% images)",
+                        f"{get_reason_description(ReasonCode.PDF_MIXED)} "
+                        f"({text_length} chars, {image_coverage:.1f}% images)",
                         confidence,
                         CATEGORY_UNSTRUCTURED,
                         ReasonCode.PDF_MIXED,
                     )
 
-            # Image-only layout
             elif layout_type == "image_only":
                 confidence = calculate_confidence_from_signals(
                     signals, needs_ocr=True, ocr_score=ocr_score, config=config
                 )
-                # Ensure high confidence for image-only
                 confidence = max(confidence, 0.85)
                 return (
                     True,
-                    f"{get_reason_description(ReasonCode.PDF_SCANNED)} (image-only layout, {image_coverage:.1f}% images)",
+                    f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                    f"(image-only layout, {image_coverage:.1f}% images)",
                     confidence,
                     CATEGORY_UNSTRUCTURED,
                     ReasonCode.PDF_SCANNED,
                 )
 
-            # Text-only layout
             elif layout_type == "text_only":
                 if text_length >= config.min_text_length:
                     confidence = calculate_confidence_from_signals(
                         signals, needs_ocr=False, ocr_score=ocr_score, config=config
                     )
-                    # Ensure high confidence for text-only with sufficient text
                     confidence = max(confidence, 0.85)
                     return (
                         False,
-                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (text-only layout, {text_length} chars)",
+                        f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                        f"(text-only layout, {text_length} chars)",
                         confidence,
                         CATEGORY_STRUCTURED,
                         ReasonCode.PDF_DIGITAL,
                     )
                 else:
-                    # Text-only but sparse - might be scanned text
                     confidence = calculate_confidence_from_signals(
                         signals, needs_ocr=True, ocr_score=ocr_score, config=config
                     )
                     return (
                         True,
-                        f"{get_reason_description(ReasonCode.PDF_SCANNED)} (text-only layout but sparse, {text_length} chars)",
+                        f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                        f"(text-only layout but sparse, {text_length} chars)",
                         confidence,
                         CATEGORY_UNSTRUCTURED,
                         ReasonCode.PDF_SCANNED,
                     )
 
-        # OCR_SCORE > 0.6 → OCR (but only if layout analysis available, otherwise use text_length)
-        # Use scoring model as additional signal when layout data is available
-        if ocr_score is not None and ocr_score > 0.6:
-            # Use unified confidence calculation based on OCR_SCORE
+        # ── Score bands: primary fallback (now always reached for borderline PDFs) ──
+        low_band = config.ocr_score_low_band_max
+        high_band = config.ocr_score_high_band_min
+
+        if ocr_score <= low_band:
+            confidence = calculate_confidence_from_signals(
+                signals, needs_ocr=False, ocr_score=ocr_score, config=config
+            )
+            return (
+                False,
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                f"(score band: digital, OCR score {ocr_score:.2f})",
+                confidence,
+                CATEGORY_STRUCTURED,
+                ReasonCode.PDF_DIGITAL,
+            )
+
+        if ocr_score >= high_band:
             confidence = calculate_confidence_from_signals(
                 signals, needs_ocr=True, ocr_score=ocr_score, config=config
             )
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (scoring model: OCR score {ocr_score:.2f}, {image_coverage:.1f}% images, {text_length} chars)",
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                f"(score band: scanned, OCR score {ocr_score:.2f})",
                 confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
 
-        # Fallback to text-length based decision (when layout analysis not available)
+        # Borderline band: text length as tiebreaker
         if text_length >= config.min_text_length:
-            # Use unified confidence calculation (fallback mode)
             confidence = calculate_confidence_from_signals(
-                signals, needs_ocr=False, ocr_score=None, config=config
+                signals, needs_ocr=False, ocr_score=ocr_score, config=config
             )
             return (
                 False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} ({text_length} chars)",
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                f"(borderline score {ocr_score:.2f}, {text_length} chars)",
                 confidence,
                 CATEGORY_STRUCTURED,
                 ReasonCode.PDF_DIGITAL,
             )
-        else:
-            # Use unified confidence calculation (fallback mode)
-            confidence = calculate_confidence_from_signals(
-                signals, needs_ocr=True, ocr_score=None, config=config
-            )
-            return (
-                True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} ({text_length} chars)",
-                confidence,
-                CATEGORY_UNSTRUCTURED,
-                ReasonCode.PDF_SCANNED,
-            )
 
-    # Rule 5: JSON/XML - NO OCR
+        confidence = calculate_confidence_from_signals(
+            signals, needs_ocr=True, ocr_score=ocr_score, config=config
+        )
+        return (
+            True,
+            f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+            f"(borderline score {ocr_score:.2f}, {text_length} chars)",
+            confidence,
+            CATEGORY_UNSTRUCTURED,
+            ReasonCode.PDF_SCANNED,
+        )
+
+    # Rule 5: JSON/XML
     if mime in ["application/json", "application/xml"] or extension in ["json", "xml"]:
         return (
             False,
@@ -484,7 +558,7 @@ def decide(
             ReasonCode.STRUCTURED_DATA,
         )
 
-    # Rule 6: HTML - NO OCR (text can be extracted)
+    # Rule 6: HTML
     if mime in ["text/html", "application/xhtml+xml"] or extension in ["html", "htm"]:
         if text_length >= config.min_text_length:
             return (
@@ -494,16 +568,15 @@ def decide(
                 CATEGORY_STRUCTURED,
                 ReasonCode.HTML_WITH_TEXT,
             )
-        else:
-            return (
-                True,
-                get_reason_description(ReasonCode.HTML_MINIMAL),
-                config.low_confidence,
-                CATEGORY_UNSTRUCTURED,
-                ReasonCode.HTML_MINIMAL,
-            )
+        return (
+            True,
+            get_reason_description(ReasonCode.HTML_MINIMAL),
+            config.low_confidence,
+            CATEGORY_UNSTRUCTURED,
+            ReasonCode.HTML_MINIMAL,
+        )
 
-    # Rule 7: Unknown binaries - YES OCR (conservative default)
+    # Rule 7: Unknown binaries
     if is_binary:
         return (
             True,
@@ -513,7 +586,6 @@ def decide(
             ReasonCode.UNKNOWN_BINARY,
         )
 
-    # Fallback: default to needing OCR
     return (
         True,
         get_reason_description(ReasonCode.UNRECOGNIZED_TYPE),
@@ -533,25 +605,7 @@ def refine_with_opencv(
     initial_reason_code: str,
     config: Optional[Config] = None,
 ) -> Tuple[bool, str, float, str, str]:
-    """
-    Refine decision using OpenCV layout analysis results.
-
-    This is called when initial heuristics have low confidence (< layout_refinement_threshold).
-    Uses OpenCV layout analysis to improve accuracy.
-
-    Args:
-        signals: Original signals from heuristics
-        opencv_result: OpenCV layout analysis results
-        initial_needs_ocr: Initial decision from heuristics
-        initial_reason: Initial reason
-        initial_confidence: Initial confidence score
-        initial_category: Initial category
-        initial_reason_code: Initial reason code
-        config: Optional Config object with threshold settings. If None, uses default thresholds.
-
-    Returns:
-        Refined decision tuple: (needs_ocr, reason, confidence, category, reason_code)
-    """
+    """Refine decision using OpenCV layout analysis results."""
     if config is None:
         config = _DEFAULT_CONFIG
 
@@ -561,213 +615,189 @@ def refine_with_opencv(
     has_text_regions = opencv_result.get("has_text_regions", False)
     layout_type = opencv_result.get("layout_type", "unknown")
 
-    # 1. Hard Digital Check (defense-in-depth)
+    # Hard Digital guard
     if text_length >= config.hard_digital_text_threshold:
         return (
             False,
-            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (hard digital: {text_length} chars extractable)",
+            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+            f"(hard digital: {text_length} chars extractable)",
             config.high_confidence,
             CATEGORY_STRUCTURED,
             ReasonCode.PDF_DIGITAL,
         )
 
-    # 2. Hard Scan Check
+    # Hard Scan guard
     if (
         image_coverage_opencv >= config.hard_scan_image_coverage_min
         and text_length < config.hard_scan_text_max
     ):
         return (
             True,
-            f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hard scan: {image_coverage_opencv:.1f}% images, {text_length} chars)",
+            f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+            f"(hard scan: {image_coverage_opencv:.1f}% images, {text_length} chars)",
             config.high_confidence,
             CATEGORY_UNSTRUCTURED,
             ReasonCode.PDF_SCANNED,
         )
 
-    # Calculate OCR_SCORE from OpenCV results for unified confidence
-    ocr_score_opencv = calculate_ocr_score(
-        text_length, image_coverage_opencv, text_coverage_opencv, config
-    )
-
-    # Update signals with OpenCV layout data for confidence calculation
+    # Merge OpenCV values into signals for scoring
     signals_with_opencv = signals.copy()
     signals_with_opencv["layout_type"] = layout_type
     signals_with_opencv["text_coverage"] = text_coverage_opencv
     signals_with_opencv["image_coverage"] = image_coverage_opencv
 
-    # Calculate image_ratio from image_coverage (convert percentage to ratio)
-    image_ratio = image_coverage_opencv / 100.0 if image_coverage_opencv > 0 else 0.0
+    # CHANGE 2: compute score before bias checks
+    ocr_score_opencv = _calculate_ocr_score_from_signals(
+        signals_with_opencv, text_coverage_opencv, image_coverage_opencv, config
+    )
 
-    # 🔥 Hybrid Rule: Sweet spot for OCR detection (applied in OpenCV refinement too)
-    # If image_ratio > 0.75 AND extracted_text_length < 30 → OCR
-    if image_ratio > 0.75 and text_length < 30:
-        # Use unified confidence calculation
-        confidence = calculate_confidence_from_signals(
-            signals_with_opencv, needs_ocr=True, ocr_score=ocr_score_opencv, config=config
-        )
-        # Ensure high confidence for hybrid rule
-        confidence = max(confidence, 0.90)
-        return (
-            True,
-            f"{get_reason_description(ReasonCode.PDF_SCANNED)} (hybrid rule: {image_coverage_opencv:.1f}% images, {text_length} chars)",
-            confidence,
-            CATEGORY_UNSTRUCTURED,
-            ReasonCode.PDF_SCANNED,
-        )
+    # CHANGE 3: shared helpers instead of inline duplicates
+    result = _check_hybrid_scan(
+        image_coverage_opencv, text_length, ocr_score_opencv, signals_with_opencv, config
+    )
+    if result:
+        return result
 
-    # Digital bias: high text + moderate image = digital (applied in refinement too)
-    tc_min = config.digital_bias_text_coverage_min
-    ic_max = config.digital_bias_image_coverage_max
-    if (
-        tc_min is not None
-        and ic_max is not None
-        and text_coverage_opencv >= tc_min
-        and image_coverage_opencv <= ic_max
-        and text_length >= config.min_text_length
-    ):
-        confidence = calculate_confidence_from_signals(
-            signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
-        )
-        confidence = max(confidence, 0.85)
-        return (
-            False,
-            f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV digital bias: {text_coverage_opencv:.1f}% text, {image_coverage_opencv:.1f}% images)",
-            confidence,
-            CATEGORY_STRUCTURED,
-            ReasonCode.PDF_DIGITAL,
-        )
+    result = _check_digital_bias(
+        text_coverage_opencv,
+        image_coverage_opencv,
+        text_length,
+        ocr_score_opencv,
+        signals_with_opencv,
+        config,
+    )
+    if result:
+        return result
 
-    # Refinement logic based on OpenCV analysis
-    # Use layout_type for more accurate decisions
-
-    # Case 1: Text-only layout
-    # BUT: Check if layout analyzer detected high image coverage (OpenCV might miss background images)
+    # Layout-type based refinement
     layout_analyzer_image_coverage = signals.get("image_coverage", 0.0)
+
     if layout_type == "text_only":
-        # If layout analyzer shows high image coverage (>70%) but OpenCV says text-only,
-        # OpenCV likely missed background images - trust layout analyzer instead
         if layout_analyzer_image_coverage > 70.0 and text_length >= config.min_text_length:
-            # High image coverage from layout analyzer - images may need OCR
             confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=True, ocr_score=ocr_score_opencv, config=config
+                signals_with_opencv,
+                needs_ocr=True,
+                ocr_score=ocr_score_opencv,
+                config=config,
             )
             confidence = max(confidence, 0.75)
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_MIXED)} (OpenCV text-only but layout analyzer detected {layout_analyzer_image_coverage:.1f}% images, may contain text in images)",
+                f"{get_reason_description(ReasonCode.PDF_MIXED)} "
+                f"(OpenCV text-only but layout analyzer detected "
+                f"{layout_analyzer_image_coverage:.1f}% images)",
                 confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_MIXED,
             )
 
         if text_length >= config.min_text_length and text_coverage_opencv > 15:
-            # Digital text document - use unified confidence calculation
             confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
+                signals_with_opencv,
+                needs_ocr=False,
+                ocr_score=ocr_score_opencv,
+                config=config,
             )
-            # Ensure high confidence for text-only with sufficient text
             confidence = max(confidence, 0.85)
             return (
                 False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV detected text-only layout, {text_length} chars, {text_coverage_opencv:.1f}% coverage)",
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                f"(OpenCV text-only, {text_length} chars, "
+                f"{text_coverage_opencv:.1f}% coverage)",
                 confidence,
                 CATEGORY_STRUCTURED,
                 ReasonCode.PDF_DIGITAL,
             )
-        elif text_length < config.min_text_length and text_coverage_opencv > 10:
-            # Text regions detected but no extractable text = likely scanned text
-            # Use unified confidence calculation
+
+        if text_length < config.min_text_length and text_coverage_opencv > 10:
             confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=True, ocr_score=ocr_score_opencv, config=config
+                signals_with_opencv,
+                needs_ocr=True,
+                ocr_score=ocr_score_opencv,
+                config=config,
             )
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_SCANNED)} (OpenCV detected text-only layout but no extractable text, {text_coverage_opencv:.1f}% coverage)",
+                f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+                f"(OpenCV text-only but no extractable text, "
+                f"{text_coverage_opencv:.1f}% coverage)",
                 confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_SCANNED,
             )
 
-    # Case 2: Image-only layout
     elif layout_type == "image_only":
-        # Use unified confidence calculation
         confidence = calculate_confidence_from_signals(
-            signals_with_opencv, needs_ocr=True, ocr_score=ocr_score_opencv, config=config
+            signals_with_opencv,
+            needs_ocr=True,
+            ocr_score=ocr_score_opencv,
+            config=config,
         )
-        # Ensure high confidence for image-only (override if needed)
         confidence = max(confidence, 0.85)
-        # Weight with initial confidence: 30% initial, 70% OCR_SCORE-based
         confidence = (initial_confidence * 0.3) + (confidence * 0.7)
         confidence = min(confidence, config.high_confidence)
         return (
             True,
-            f"{get_reason_description(ReasonCode.PDF_SCANNED)} (OpenCV detected image-only layout, {image_coverage_opencv:.1f}% images)",
+            f"{get_reason_description(ReasonCode.PDF_SCANNED)} "
+            f"(OpenCV image-only, {image_coverage_opencv:.1f}% images)",
             round(confidence, 2),
             CATEGORY_UNSTRUCTURED,
             ReasonCode.PDF_SCANNED,
         )
 
-    # Case 3: Mixed content layout
     elif layout_type == "mixed":
-        # Table bias: high text density = tables/digital
-        td_min = config.table_bias_text_density_min
-        tc_min_table = config.table_bias_text_coverage_min
-        text_density = signals.get("text_density", 0.0)
-        if (
-            td_min is not None
-            and tc_min_table is not None
-            and text_density >= td_min
-            and text_coverage_opencv >= tc_min_table
-            and text_length >= config.min_text_length
-        ):
-            confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
-            )
-            confidence = max(confidence, 0.80)
-            return (
-                False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV mixed, table bias: text_density {text_density:.1f})",
-                confidence,
-                CATEGORY_STRUCTURED,
-                ReasonCode.PDF_DIGITAL,
-            )
+        # CHANGE 3: shared table bias helper
+        result = _check_table_bias(
+            text_coverage_opencv,
+            text_length,
+            ocr_score_opencv,
+            signals_with_opencv,
+            config,
+        )
+        if result:
+            return result
+
         if text_coverage_opencv > 15 and text_length >= config.min_text_length:
-            # Text is significant, might not need full OCR
-            # Use unified confidence calculation
             confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=False, ocr_score=ocr_score_opencv, config=config
+                signals_with_opencv,
+                needs_ocr=False,
+                ocr_score=ocr_score_opencv,
+                config=config,
             )
             return (
                 False,
-                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} (OpenCV detected mixed content, text sufficient, {text_length} chars, {text_coverage_opencv:.1f}% text, {image_coverage_opencv:.1f}% images)",
+                f"{get_reason_description(ReasonCode.PDF_DIGITAL)} "
+                f"(OpenCV mixed, text sufficient: {text_length} chars, "
+                f"{text_coverage_opencv:.1f}% text, {image_coverage_opencv:.1f}% images)",
                 confidence,
                 CATEGORY_STRUCTURED,
                 ReasonCode.PDF_DIGITAL,
             )
         else:
-            # Mixed but text is sparse, needs OCR
-            # Use unified confidence calculation
             confidence = calculate_confidence_from_signals(
-                signals_with_opencv, needs_ocr=True, ocr_score=ocr_score_opencv, config=config
+                signals_with_opencv,
+                needs_ocr=True,
+                ocr_score=ocr_score_opencv,
+                config=config,
             )
             return (
                 True,
-                f"{get_reason_description(ReasonCode.PDF_MIXED)} (OpenCV detected mixed content, {text_coverage_opencv:.1f}% text, {image_coverage_opencv:.1f}% images)",
+                f"{get_reason_description(ReasonCode.PDF_MIXED)} "
+                f"(OpenCV mixed, {text_coverage_opencv:.1f}% text, "
+                f"{image_coverage_opencv:.1f}% images)",
                 confidence,
                 CATEGORY_UNSTRUCTURED,
                 ReasonCode.PDF_MIXED,
             )
 
-    # If OpenCV confirms initial decision, use weighted confidence
+    # OpenCV confirms initial decision
     if (initial_needs_ocr and not has_text_regions) or (not initial_needs_ocr and has_text_regions):
-        # Calculate OCR_SCORE-based confidence
         ocr_confidence = calculate_confidence_from_signals(
             signals_with_opencv,
             needs_ocr=initial_needs_ocr,
             ocr_score=ocr_score_opencv,
             config=config,
         )
-        # Weighted combination: 30% initial, 70% OCR_SCORE-based (OpenCV is more accurate)
         confidence = (initial_confidence * 0.3) + (ocr_confidence * 0.7)
         confidence = min(confidence, config.high_confidence)
         return (
@@ -778,10 +808,12 @@ def refine_with_opencv(
             initial_reason_code,
         )
 
-    # Default: return refined but keep initial decision
-    # Use weighted confidence: 50% initial, 50% OCR_SCORE-based
+    # Default: keep initial decision, blend confidence
     ocr_confidence = calculate_confidence_from_signals(
-        signals_with_opencv, needs_ocr=initial_needs_ocr, ocr_score=ocr_score_opencv, config=config
+        signals_with_opencv,
+        needs_ocr=initial_needs_ocr,
+        ocr_score=ocr_score_opencv,
+        config=config,
     )
     confidence = (initial_confidence * 0.5) + (ocr_confidence * 0.5)
     confidence = min(confidence, config.high_confidence)

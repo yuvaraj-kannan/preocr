@@ -91,7 +91,19 @@ class Config:
         digital_bias_image_coverage_max: With above: require image_coverage <= this. None = disabled.
         table_bias_text_density_min: For mixed layout: treat as digital when text_density >= this. None = disabled.
         table_bias_text_coverage_min: With above: require text_coverage >= this. None = disabled.
-        ocr_score_image_weight: Weight for image_ratio in OCR score (default 0.35). None = use 0.35.
+        ocr_score_text_weight: Weight for normalized text strength in OCR score. None = use 0.35.
+        ocr_score_image_weight: Weight for image_ratio (image coverage) in OCR score. None = use 0.35.
+        ocr_score_noise_weight: Weight for text-layer noise (non-printable / unicode noise). None = use 0.20.
+        ocr_score_font_weight: Weight for font signal (embedded fonts). None = use 0.10.
+
+        ocr_decision_threshold: Central threshold for deciding needs_ocr from OCR score (0.0-1.0).
+                               Higher score = more likely to need OCR. Default: 0.5.
+        ocr_score_low_band_max: Upper bound of the "confidently no OCR" band. Scores <= this
+                               are treated as digital unless strong counter-signals exist.
+                               Default: 0.30.
+        ocr_score_high_band_min: Lower bound of the "confidently needs OCR" band. Scores >= this
+                                are treated as needing OCR unless strong counter-signals exist.
+                                Default: 0.70.
 
         hard_digital_text_threshold: Hard Digital Check - if text_length >= this, NO OCR (early exit). Default: 20.
         hard_scan_image_coverage_min: Hard Scan Check - if image_coverage >= this AND text_length <= hard_scan_text_max, OCR. Default: 80.
@@ -133,7 +145,13 @@ class Config:
     digital_bias_image_coverage_max: Optional[float] = 50.0
     table_bias_text_density_min: Optional[float] = 1.5
     table_bias_text_coverage_min: Optional[float] = 40.0
+    ocr_score_text_weight: Optional[float] = None
     ocr_score_image_weight: Optional[float] = None
+    ocr_score_noise_weight: Optional[float] = None
+    ocr_score_font_weight: Optional[float] = None
+    ocr_decision_threshold: float = 0.5
+    ocr_score_low_band_max: float = 0.30
+    ocr_score_high_band_min: float = 0.70
     hard_digital_text_threshold: int = HARD_DIGITAL_TEXT_THRESHOLD
     hard_scan_image_coverage_min: float = HARD_SCAN_IMAGE_COVERAGE_MIN
     hard_scan_text_max: int = HARD_SCAN_TEXT_MAX
@@ -160,6 +178,25 @@ class Config:
         # Ensure confidence thresholds are in order
         if not (self.low_confidence <= self.medium_confidence <= self.high_confidence):
             raise ValueError("Confidence thresholds must be ordered: low <= medium <= high")
+
+        # Ensure OCR score thresholds and bands are within [0, 1]
+        for name, value in [
+            ("ocr_decision_threshold", self.ocr_decision_threshold),
+            ("ocr_score_low_band_max", self.ocr_score_low_band_max),
+            ("ocr_score_high_band_min", self.ocr_score_high_band_min),
+        ]:
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be between 0.0 and 1.0")
+
+        if (
+            not self.ocr_score_low_band_max
+            <= self.ocr_decision_threshold
+            <= self.ocr_score_high_band_min
+        ):
+            raise ValueError(
+                "OCR score thresholds must be ordered: "
+                "ocr_score_low_band_max <= ocr_decision_threshold <= ocr_score_high_band_min"
+            )
 
 
 # Reason codes for structured decision tracking

@@ -215,7 +215,9 @@ def _render_page_content(
         lines.append("")
 
     # Tables for this page (sort by y for doc order; skip decorative)
-    page_tables = [t for t in tables_by_page.get(page_num, []) if not t.metadata.get("is_decorative")]
+    page_tables = [
+        t for t in tables_by_page.get(page_num, []) if not t.metadata.get("is_decorative")
+    ]
     page_tables.sort(key=lambda t: getattr(t.bbox, "y0", 0) if t.bbox else 0)
     for table in page_tables:
         table_md = _format_table_as_markdown(table)
