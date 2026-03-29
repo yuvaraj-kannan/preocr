@@ -202,14 +202,14 @@ class Config:
     def for_scanned_documents(cls) -> "Config":
         """
         Config preset for domains with mostly scanned documents.
-        
+
         Optimizes for:
         - Higher OCR detection rate (low threshold)
         - Strict digital criteria (high bar to skip OCR)
         - Good for: medical PDFs, legal documents, historical scans
-        
+
         Use when: Your document mix is 60%+ scanned/image-heavy
-        
+
         Returns:
             Config optimized for scanned document detection
         """
@@ -231,14 +231,14 @@ class Config:
     def for_cost_optimization(cls) -> "Config":
         """
         Config preset for aggressive OCR skipping to minimize costs.
-        
+
         Optimizes for:
         - Maximize digital PDF detection (skip more OCR runs)
         - Lower confidence thresholds (faster decisions)
         - Good for: high-volume batch processing, e-commerce, SaaS workflows
-        
+
         Use when: Your primary goal is cost reduction, tolerate some false negatives
-        
+
         Returns:
             Config optimized for cost savings
         """
@@ -261,14 +261,14 @@ class Config:
     def for_tables_and_forms(cls) -> "Config":
         """
         Config preset for structured data extraction (tables, forms, fields).
-        
+
         Optimizes for:
         - Conservative OCR detection (high bar to skip OCR)
         - Table/form-aware decision logic
         - Good for: financial reports, tax forms, invoices, data extraction
-        
+
         Use when: You need tables/forms extracted accurately; false negatives are worse than false positives
-        
+
         Returns:
             Config optimized for structured data preservation
         """
@@ -293,14 +293,14 @@ class Config:
     def for_mixed_content(cls) -> "Config":
         """
         Config preset for balanced processing of mixed document types.
-        
+
         Optimizes for:
         - Balanced OCR/no-OCR decisions
         - Moderate refinement (balance speed and accuracy)
         - Good for: general document pipelines, unknown mixed sources
-        
+
         Use when: You don't know your document distribution in advance
-        
+
         Returns:
             Config with balanced thresholds
         """
@@ -320,14 +320,14 @@ class Config:
     def high_precision(cls) -> "Config":
         """
         Config preset for maximum accuracy (slower, higher confidence thresholds).
-        
+
         Optimizes for:
         - High confidence in every decision
         - Full layout/OpenCV analysis always
         - Good for: critical documents, compliance, validation workflows
-        
+
         Use when: Accuracy matters more than speed; cost isn't a concern
-        
+
         Returns:
             Config prioritizing decision quality over speed
         """

@@ -28,7 +28,7 @@ def format_json_serializable(obj: Any) -> Any:
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """PreOCR – Fast OCR detection for document processing pipelines.
-    
+
     Determine if files need OCR before expensive processing.
     """
     if ctx.invoked_subcommand is None:
@@ -61,14 +61,16 @@ def main(ctx: click.Context) -> None:
 @click.option(
     "--config-preset",
     "-c",
-    type=click.Choice([
-        "default",
-        "scanned-documents",
-        "cost-optimization",
-        "tables-and-forms",
-        "mixed-content",
-        "high-precision",
-    ]),
+    type=click.Choice(
+        [
+            "default",
+            "scanned-documents",
+            "cost-optimization",
+            "tables-and-forms",
+            "mixed-content",
+            "high-precision",
+        ]
+    ),
     default="default",
     help="Config preset for specific use cases.",
 )
@@ -89,7 +91,7 @@ def check(
     format: str,
 ) -> None:
     """Analyze a single file to determine if it needs OCR.
-    
+
     Example:
         preocr check document.pdf --verbose
         preocr check document.pdf --format json
@@ -110,9 +112,9 @@ def check(
             config = Config.high_precision()
         else:
             config = None
-        
+
         file_path_obj = Path(file_path)
-        
+
         with click.progressbar(
             length=100,
             label=f"Analyzing {file_path_obj.name}",
@@ -136,36 +138,46 @@ def check(
             click.echo(f"\n📄 File: {file_path_obj.name}")
             click.echo(f"📋 File Type: {result.get('file_type', 'unknown')}")
             click.echo("")
-            
+
             needs = result.get("needs_ocr", False)
             icon = "❌ NEEDS OCR" if needs else "✅ DIGITAL"
             click.echo(f"{icon}")
             click.echo(f"Reason: {result.get('reason', 'unknown')}")
             click.echo(f"Confidence: {result.get('confidence', 0):.1%}")
             click.echo(f"Category: {result.get('category', 'unknown')}")
-            
+
             if verbose:
                 click.echo("\n📊 Decision Breakdown:")
                 click.echo(f"  Reason Code: {result.get('reason_code', 'unknown')}")
-                
+
             if signals and "signals" in result:
                 sigs = result["signals"]
                 click.echo("\n🔍 Signals:")
                 click.echo(f"  Text length: {sigs.get('text_length', 0)} chars")
-                text_cov = sigs.get('text_coverage')
-                text_cov_str = f"{text_cov:.1f}%" if text_cov is not None and text_cov >= 0 else "N/A (not analyzed)"
+                text_cov = sigs.get("text_coverage")
+                text_cov_str = (
+                    f"{text_cov:.1f}%"
+                    if text_cov is not None and text_cov >= 0
+                    else "N/A (not analyzed)"
+                )
                 click.echo(f"  Text coverage: {text_cov_str}")
-                img_cov = sigs.get('image_coverage')
-                img_cov_str = f"{img_cov:.1f}%" if img_cov is not None and img_cov >= 0 else "N/A (not analyzed)"
+                img_cov = sigs.get("image_coverage")
+                img_cov_str = (
+                    f"{img_cov:.1f}%"
+                    if img_cov is not None and img_cov >= 0
+                    else "N/A (not analyzed)"
+                )
                 click.echo(f"  Image coverage: {img_cov_str}")
-                layout_type = sigs.get('layout_type')
+                layout_type = sigs.get("layout_type")
                 if layout_type:
                     click.echo(f"  Layout type: {layout_type}")
                 if sigs.get("font_count") is not None:
                     click.echo(f"  Fonts detected: {sigs.get('font_count')}")
                 if text_cov is None and layout_aware:
-                    click.echo(f"  ℹ️  Layout analysis skipped (early exit: {result.get('reason_code', 'N/A')})")
-                
+                    click.echo(
+                        f"  ℹ️  Layout analysis skipped (early exit: {result.get('reason_code', 'N/A')})"
+                    )
+
             if page_level and result.get("pages"):
                 click.echo(f"\n📑 Page Analysis ({len(result['pages'])} pages):")
                 for page in result["pages"][:5]:  # Show first 5 pages
@@ -181,27 +193,31 @@ def check(
             click.echo("\n" + "─" * 70)
             click.echo(f"{'File':<40} {file_path_obj.name:<28} │")
             click.echo(f"{'File Type':<40} {result.get('file_type', 'unknown'):<28} │")
-            needs_ocr_text = 'Yes' if result.get('needs_ocr') else 'No'
+            needs_ocr_text = "Yes" if result.get("needs_ocr") else "No"
             click.echo(f"{'Needs OCR':<40} {needs_ocr_text:<28} │")
             conf_str = f"{result.get('confidence', 0):.1%}"
             click.echo(f"{'Confidence':<40} {conf_str:<28} │")
             click.echo(f"{'Category':<40} {result.get('category', 'unknown'):<28} │")
-            reason_text = result.get('reason', '')[:27] if result.get('reason') else ''
+            reason_text = result.get("reason", "")[:27] if result.get("reason") else ""
             click.echo(f"{'Reason':<40} {reason_text:<28} │")
             click.echo("─" * 70 + "\n")
-            
+
             if signals and "signals" in result:
                 sigs = result["signals"]
                 click.echo("Signal Details:")
                 click.echo(f"  Text length: {sigs.get('text_length', 0)} chars")
-                text_cov = sigs.get('text_coverage')
-                text_cov_str = f"{text_cov:.1f}%" if text_cov is not None and text_cov >= 0 else "N/A"
+                text_cov = sigs.get("text_coverage")
+                text_cov_str = (
+                    f"{text_cov:.1f}%" if text_cov is not None and text_cov >= 0 else "N/A"
+                )
                 click.echo(f"  Text coverage: {text_cov_str}")
-                img_cov = sigs.get('image_coverage')
+                img_cov = sigs.get("image_coverage")
                 img_cov_str = f"{img_cov:.1f}%" if img_cov is not None and img_cov >= 0 else "N/A"
                 click.echo(f"  Image coverage: {img_cov_str}")
                 if text_cov is None and layout_aware:
-                    click.echo(f"  ℹ️  Tip: Layout analysis was skipped (early exit: {result.get('reason_code', 'N/A')})")
+                    click.echo(
+                        f"  ℹ️  Tip: Layout analysis was skipped (early exit: {result.get('reason_code', 'N/A')})"
+                    )
                 click.echo("")
 
     except FileNotFoundError:
@@ -247,14 +263,16 @@ def check(
 @click.option(
     "--config-preset",
     "-c",
-    type=click.Choice([
-        "default",
-        "scanned-documents",
-        "cost-optimization",
-        "tables-and-forms",
-        "mixed-content",
-        "high-precision",
-    ]),
+    type=click.Choice(
+        [
+            "default",
+            "scanned-documents",
+            "cost-optimization",
+            "tables-and-forms",
+            "mixed-content",
+            "high-precision",
+        ]
+    ),
     default="default",
     help="Config preset for specific use cases.",
 )
@@ -290,7 +308,7 @@ def batch_analyze(
     report_theme: str,
 ) -> None:
     """Analyze multiple files in a directory.
-    
+
     Example:
         preocr batch-analyze ./documents --pattern '*.pdf'
         preocr batch-analyze ./documents -r --format csv --output results.csv
@@ -310,22 +328,22 @@ def batch_analyze(
             config = Config.high_precision()
         else:
             config = None
-        
+
         dir_path = Path(directory)
-        
+
         # Find files
         search_pattern = f"**/{pattern}" if recursive else pattern
         files = sorted(dir_path.glob(search_pattern))
-        
+
         if not files:
             click.echo(f"⚠️  No files found matching '{pattern}' in {directory}", err=True)
             return
-        
+
         if limit:
             files = files[:limit]
-        
+
         results: List[Dict[str, Any]] = []
-        
+
         with click.progressbar(
             files,
             label="Analyzing files",
@@ -334,54 +352,65 @@ def batch_analyze(
             for file_path in bar:
                 try:
                     result = needs_ocr(file_path, layout_aware=layout_aware, config=config)
-                    results.append({
-                        "file": str(file_path.relative_to(dir_path)),
-                        "needs_ocr": result.get("needs_ocr"),
-                        "confidence": result.get("confidence"),
-                        "file_type": result.get("file_type"),
-                        "category": result.get("category"),
-                        "reason_code": result.get("reason_code"),
-                    })
+                    results.append(
+                        {
+                            "file": str(file_path.relative_to(dir_path)),
+                            "needs_ocr": result.get("needs_ocr"),
+                            "confidence": result.get("confidence"),
+                            "file_type": result.get("file_type"),
+                            "category": result.get("category"),
+                            "reason_code": result.get("reason_code"),
+                        }
+                    )
                 except Exception as e:
-                    results.append({
-                        "file": str(file_path.relative_to(dir_path)),
-                        "needs_ocr": None,
-                        "confidence": 0.0,
-                        "file_type": "error",
-                        "category": "error",
-                        "reason_code": f"ERROR: {str(e)}",
-                    })
-        
+                    results.append(
+                        {
+                            "file": str(file_path.relative_to(dir_path)),
+                            "needs_ocr": None,
+                            "confidence": 0.0,
+                            "file_type": "error",
+                            "category": "error",
+                            "reason_code": f"ERROR: {str(e)}",
+                        }
+                    )
+
         # Output results
         if format == "json":
             output_text = json.dumps(format_json_serializable(results), indent=2)
-        
+
         elif format == "csv":
             import csv
             import io
-            
+
             output_buffer = io.StringIO()
             writer = csv.DictWriter(
                 output_buffer,
-                fieldnames=["file", "needs_ocr", "confidence", "file_type", "category", "reason_code"],
+                fieldnames=[
+                    "file",
+                    "needs_ocr",
+                    "confidence",
+                    "file_type",
+                    "category",
+                    "reason_code",
+                ],
             )
             writer.writeheader()
             writer.writerows(results)
             output_text = output_buffer.getvalue()
-        
+
         else:  # table format
             # Calculate statistics
             total = len(results)
             needs_ocr_count = sum(1 for r in results if r["needs_ocr"])
             digital_count = total - needs_ocr_count
             avg_confidence = sum(r["confidence"] for r in results) / total if total > 0 else 0
-            
+
             lines = [
                 "\n" + "─" * 80,
                 f"{'File':<50} {'Needs OCR':<15} {'Confidence':<15}",
                 "─" * 80,
             ]
-            
+
             for result in results[:50]:  # Show first 50
                 needs = "❌ Yes" if result["needs_ocr"] else "✅ No"
                 conf = f"{result['confidence']:.1%}" if result["confidence"] else "–"
@@ -389,21 +418,23 @@ def batch_analyze(
                 if len(filename) > 48:
                     filename = "..." + filename[-45:]
                 lines.append(f"{filename:<50} {needs:<15} {conf:<15}")
-            
+
             if len(results) > 50:
                 lines.append(f"... and {len(results) - 50} more files")
-            
-            lines.extend([
-                "─" * 80,
-                f"Summary: {total} files analyzed",
-                f"  Digital (no OCR needed): {digital_count} ({digital_count/total:.1%})",
-                f"  Needs OCR: {needs_ocr_count} ({needs_ocr_count/total:.1%})",
-                f"  Average confidence: {avg_confidence:.1%}",
-                "",
-            ])
-            
+
+            lines.extend(
+                [
+                    "─" * 80,
+                    f"Summary: {total} files analyzed",
+                    f"  Digital (no OCR needed): {digital_count} ({digital_count/total:.1%})",
+                    f"  Needs OCR: {needs_ocr_count} ({needs_ocr_count/total:.1%})",
+                    f"  Average confidence: {avg_confidence:.1%}",
+                    "",
+                ]
+            )
+
             output_text = "\n".join(lines)
-        
+
         # Display or save
         if output:
             output_path = Path(output)
@@ -411,7 +442,7 @@ def batch_analyze(
             click.echo(f"✅ Results saved to: {output_path}")
         else:
             click.echo(output_text)
-        
+
         # Generate HTML report if requested
         if report:
             with click.progressbar(
@@ -428,11 +459,11 @@ def batch_analyze(
                 )
                 report_result = generate_html_report(results, report_config)
                 bar.update(100)
-            
+
             report_path = Path(report)
             report_path.write_text(report_result.html_content)
             click.echo(f"✅ HTML report saved to: {report_path}")
-    
+
     except Exception as e:
         click.echo(f"❌ Error: {str(e)}", err=True)
         raise SystemExit(1)
@@ -466,9 +497,9 @@ def generate_report(
     theme: str,
 ) -> None:
     """Generate an HTML report from analysis results.
-    
+
     Takes a JSON or CSV file from batch-analyze and creates an HTML report.
-    
+
     Example:
         preocr generate-report results.json --output report.html
         preocr generate-report results.csv -o report.html --theme dark
@@ -476,7 +507,7 @@ def generate_report(
     try:
         results_path = Path(results_file)
         output_path = Path(output)
-        
+
         # Load results
         with click.progressbar(
             length=100,
@@ -487,6 +518,7 @@ def generate_report(
                 results = json.loads(results_path.read_text())
             elif results_path.suffix.lower() == ".csv":
                 import csv
+
                 reader = csv.DictReader(results_path.open())
                 results = []
                 for row in reader:
@@ -505,7 +537,7 @@ def generate_report(
                 )
                 raise SystemExit(1)
             bar.update(100)
-        
+
         # Generate report
         with click.progressbar(
             length=100,
@@ -521,19 +553,19 @@ def generate_report(
             )
             report_result = generate_html_report(results, report_config)
             bar.update(100)
-        
+
         # Save report
         output_path.write_text(report_result.html_content)
         click.echo(f"✅ HTML report saved to: {output_path}")
-        
+
         # Print summary
         summary = report_result.summary
-        click.echo(f"\n📊 Report Summary:")
+        click.echo("\n📊 Report Summary:")
         click.echo(f"  Total files: {summary['total_files']}")
         click.echo(f"  Digital: {summary['digital_count']} ({summary['digital_percentage']:.1f}%)")
         click.echo(f"  Needs OCR: {summary['ocr_needed_count']} ({summary['ocr_percentage']:.1f}%)")
         click.echo(f"  Avg confidence: {summary['average_confidence']:.1%}")
-    
+
     except FileNotFoundError:
         click.echo(f"❌ File not found: {results_file}", err=True)
         raise SystemExit(1)

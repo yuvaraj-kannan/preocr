@@ -1,6 +1,5 @@
 """HTML report generation for PreOCR decision analysis."""
 
-import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +9,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class ReportConfig:
     """Configuration for report generation."""
+
     title: str = "PreOCR Analysis Report"
     include_signals: bool = True
     include_confidence_details: bool = True
@@ -20,6 +20,7 @@ class ReportConfig:
 @dataclass
 class DecisionReport:
     """Result of report generation."""
+
     html_content: str
     summary: Dict[str, Any]
     file_path: Optional[Path] = None
@@ -47,27 +48,25 @@ def generate_html_report(
 ) -> DecisionReport:
     """
     Generate an HTML report from batch analysis results.
-    
+
     Args:
         results: List of result dictionaries from needs_ocr()
         config: ReportConfig for customization
-    
+
     Returns:
         DecisionReport with HTML content and summary statistics
     """
     if config is None:
         config = ReportConfig()
-    
+
     # Calculate summary statistics
     total_files = len(results)
     ocr_needed = sum(1 for r in results if r.get("needs_ocr"))
     digital = total_files - ocr_needed
     avg_confidence = (
-        sum(r.get("confidence", 0) for r in results) / total_files
-        if total_files > 0
-        else 0
+        sum(r.get("confidence", 0) for r in results) / total_files if total_files > 0 else 0
     )
-    
+
     # Group by file type
     file_types = {}
     for result in results:
@@ -77,7 +76,7 @@ def generate_html_report(
         file_types[ft]["total"] += 1
         if result.get("needs_ocr"):
             file_types[ft]["ocr"] += 1
-    
+
     # Group by category
     categories = {}
     for result in results:
@@ -87,7 +86,7 @@ def generate_html_report(
         categories[cat]["total"] += 1
         if result.get("needs_ocr"):
             categories[cat]["ocr"] += 1
-    
+
     summary = {
         "total_files": total_files,
         "digital_count": digital,
@@ -99,10 +98,10 @@ def generate_html_report(
         "categories": categories,
         "generated_at": datetime.now().isoformat(),
     }
-    
+
     # Generate HTML
     html = _build_html(results, config, summary)
-    
+
     return DecisionReport(html_content=html, summary=summary)
 
 
@@ -113,7 +112,7 @@ def _build_html(
 ) -> str:
     """Build the complete HTML document."""
     theme_css = _get_theme_css(config.theme)
-    
+
     html_parts = [
         "<!DOCTYPE html>",
         "<html lang='en'>",
@@ -129,17 +128,19 @@ def _build_html(
         _build_header(config, summary),
         _build_summary_section(summary, config),
     ]
-    
+
     if config.include_summary_charts:
         html_parts.append(_build_charts_section(summary))
-    
-    html_parts.extend([
-        _build_results_section(results, config),
-        _build_footer(),
-        "</body>",
-        "</html>",
-    ])
-    
+
+    html_parts.extend(
+        [
+            _build_results_section(results, config),
+            _build_footer(),
+            "</body>",
+            "</html>",
+        ]
+    )
+
     return "\n".join(html_parts)
 
 
@@ -633,7 +634,7 @@ def _build_header(config: ReportConfig, summary: Dict[str, Any]) -> str:
     timestamp = summary["generated_at"]
     dt = datetime.fromisoformat(timestamp)
     formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
     return f"""
     <div class="container">
       <header>
@@ -652,13 +653,13 @@ def _build_summary_section(summary: Dict[str, Any], config: ReportConfig) -> str
     avg_conf = summary["average_confidence"]
     digital_pct = summary["digital_percentage"]
     ocr_pct = summary["ocr_percentage"]
-    
+
     conf_class = (
         "confidence-high"
         if avg_conf >= 0.8
         else "confidence-medium" if avg_conf >= 0.6 else "confidence-low"
     )
-    
+
     return f"""
     <div class="container">
       <div class="summary-grid">
@@ -703,7 +704,7 @@ def _build_charts_section(summary: Dict[str, Any]) -> str:
     """Build charts and breakdown sections."""
     file_types = summary["file_types"]
     categories = summary["categories"]
-    
+
     # File type breakdown
     ft_html = []
     for ft, counts in sorted(file_types.items()):
@@ -717,7 +718,7 @@ def _build_charts_section(summary: Dict[str, Any]) -> str:
           <td>{pct:.1f}%</td>
         </tr>
         """)
-    
+
     # Category breakdown
     cat_html = []
     for cat, counts in sorted(categories.items()):
@@ -731,7 +732,7 @@ def _build_charts_section(summary: Dict[str, Any]) -> str:
           <td>{pct:.1f}%</td>
         </tr>
         """)
-    
+
     return f"""
     <div class="container">
       <div class="charts-section">
@@ -781,26 +782,23 @@ def _build_results_section(
 ) -> str:
     """Build the detailed results section."""
     rows = []
-    
+
     for result in results:
         needs_ocr = result.get("needs_ocr", False)
         status = "❌ Needs OCR" if needs_ocr else "✅ Digital"
         status_class = "status-ocr" if needs_ocr else "status-digital"
-        detail_class = "detail-row ocr" if needs_ocr else "detail-row digital"
-        
+
         confidence = result.get("confidence", 0)
         conf_class = (
             "confidence-high"
             if confidence >= 0.8
             else "confidence-medium" if confidence >= 0.6 else "confidence-low"
         )
-        
+
         file_name = Path(result.get("file", "")).name
         reason = result.get("reason", "No reason provided")
-        reason_code = result.get("reason_code", "UNKNOWN")
         file_type = result.get("file_type", "unknown")
-        category = result.get("category", "unknown")
-        
+
         signals_html = ""
         if config.include_signals and "signals" in result:
             sigs = result["signals"]
@@ -811,7 +809,7 @@ def _build_results_section(
                 signal_lines.append(f"Text coverage: {sigs['text_coverage']:.1f}%")
             if "image_coverage" in sigs and sigs["image_coverage"]:
                 signal_lines.append(f"Image coverage: {sigs['image_coverage']:.1f}%")
-            
+
             if signal_lines:
                 signals_html = f"""
                 <div class="signals">
@@ -819,7 +817,7 @@ def _build_results_section(
                   {' • '.join(signal_lines)}
                 </div>
                 """
-        
+
         rows.append(f"""
         <tr>
           <td><strong>{_escape_html(file_name)}</strong></td>
@@ -829,7 +827,7 @@ def _build_results_section(
           <td class="reason">{_format_reason(reason)}{signals_html}</td>
         </tr>
         """)
-    
+
     return f"""
     <div class="container">
       <h2 style="margin: 40px 0 20px 0; color: #667eea;">📋 Detailed Results</h2>
