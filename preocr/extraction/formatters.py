@@ -563,15 +563,17 @@ def _structure_markdown_lines(elem_texts: list) -> list:
                             table_rows.append(row_cells)
                         j += 1
                 elif header_row and not table_rows:
-                    # Header found, next may be section divider - skip non-table to find data rows
+                    # Header found; until we see a real data row, pass through any non-table
+                    # text verbatim (subsection titles, labels, etc.) — do not drop content.
                     next_typ, next_t = elem_texts[j]
                     next_cells = [p.strip() for p in next_t.strip().split("\n") if p.strip()]
                     if len(next_cells) < 3 or (
                         not _is_table_header(next_cells) and not _is_table_row(next_cells)
                     ):
-                        if _looks_like_section_header(next_t.strip()):
-                            j += 1
-                            continue
+                        lines.append(next_t.rstrip("\n"))
+                        lines.append("")
+                        j += 1
+                        continue
                     break
                 else:
                     break
