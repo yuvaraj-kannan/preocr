@@ -115,6 +115,7 @@ def check(
 
         file_path_obj = Path(file_path)
 
+        bar: Any
         with click.progressbar(
             length=100,
             label=f"Analyzing {file_path_obj.name}",
@@ -445,11 +446,12 @@ def batch_analyze(
 
         # Generate HTML report if requested
         if report:
+            report_bar: Any
             with click.progressbar(
                 length=100,
                 label="Generating HTML report",
                 show_pos=True,
-            ) as bar:
+            ) as report_bar:
                 report_config = ReportConfig(
                     title=f"PreOCR Analysis - {Path(directory).name}",
                     include_signals=True,
@@ -458,7 +460,7 @@ def batch_analyze(
                     theme=report_theme,
                 )
                 report_result = generate_html_report(results, report_config)
-                bar.update(100)
+                report_bar.update(100)
 
             report_path = Path(report)
             report_path.write_text(report_result.html_content)
@@ -509,6 +511,7 @@ def generate_report(
         output_path = Path(output)
 
         # Load results
+        bar: Any
         with click.progressbar(
             length=100,
             label="Loading results",
@@ -539,11 +542,12 @@ def generate_report(
             bar.update(100)
 
         # Generate report
+        bar_gen: Any
         with click.progressbar(
             length=100,
             label="Generating HTML report",
             show_pos=True,
-        ) as bar:
+        ) as bar_gen:
             report_config = ReportConfig(
                 title=title,
                 include_signals=True,
@@ -552,7 +556,7 @@ def generate_report(
                 theme=theme,
             )
             report_result = generate_html_report(results, report_config)
-            bar.update(100)
+            bar_gen.update(100)
 
         # Save report
         output_path.write_text(report_result.html_content)
