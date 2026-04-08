@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -53,6 +54,11 @@ def get_cache_path(cache_key: str, cache_dir: Optional[Path] = None) -> Path:
         cache_dir = _DEFAULT_CACHE_DIR
 
     cache_dir.mkdir(parents=True, exist_ok=True)
+    # Restrict cache directory to owner-only access (rwx------)
+    try:
+        os.chmod(cache_dir, 0o700)
+    except OSError:
+        pass
     return cache_dir / f"{cache_key}.json"
 
 
@@ -112,6 +118,11 @@ def cache_result(file_path: str, result: Dict[str, Any], cache_dir: Optional[Pat
     try:
         with open(cache_path, "w") as f:
             json.dump(result, f)
+        # Restrict cache file to owner read/write only (rw-------)
+        try:
+            os.chmod(cache_path, 0o600)
+        except OSError:
+            pass
         logger.debug(f"Cached result for {file_path}")
     except (IOError, OSError) as e:
         logger.warning(f"Failed to write cache: {e}")

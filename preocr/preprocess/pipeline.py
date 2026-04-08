@@ -205,7 +205,7 @@ def prepare_for_ocr(
             else:
                 resolved_steps = DEFAULT_STEPS
         else:
-            resolved_steps = DEFAULT_STEPS  # type: ignore[unreachable]
+            resolved_steps = DEFAULT_STEPS
     else:
         resolved_steps = cast(Union[List[str], Dict[str, Any]], steps)
 

@@ -44,7 +44,7 @@ def format_result(
 
 def format_as_json(result: ExtractionResult) -> Dict[str, Any]:
     """Format result as JSON-serializable dictionary."""
-    return result.model_dump(mode="json")
+    return dict(result.model_dump(mode="json"))
 
 
 def format_as_markdown(
